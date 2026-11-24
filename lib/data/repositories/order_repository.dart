@@ -5,6 +5,7 @@ import 'package:style_house/data/mock/sample_data.dart';
 import 'package:style_house/data/models/cart_item_model.dart';
 import 'package:style_house/data/models/coupon_model.dart';
 import 'package:style_house/data/models/order_model.dart';
+import 'package:style_house/data/models/product_model.dart';
 import 'package:style_house/data/repositories/product_repository.dart';
 
 class OrderRepository {
@@ -87,6 +88,9 @@ class OrderRepository {
     String? deliveryNotes,
     required String paymentMethod,
     String? couponCode,
+    List<ProductModel>? catalogProducts,
+    double? freeShippingThresholdUsd,
+    double? standardShippingFeeUsd,
   }) async {
     if (items.isEmpty) {
       throw Exception('Cannot create order with an empty shopping cart');
@@ -97,16 +101,22 @@ class OrderRepository {
     final verifiedItems = <CartItemModel>[];
 
     for (final item in items) {
-      // Lookup actual product price from repository
-      final trustedProduct = await _productRepository.getProductById(item.product.id);
-      final actualPrice = trustedProduct?.priceUsd ?? item.product.priceUsd;
+      // Lookup actual product price from live catalog first, then repository
+      ProductModel? trustedProduct;
+      if (catalogProducts != null) {
+        try {
+          trustedProduct = catalogProducts.firstWhere((p) => p.id == item.product.id);
+        } catch (_) {}
+      }
+      trustedProduct ??= await _productRepository.getProductById(item.product.id);
 
-      // Validate stock availability
-      final availableStock = await _productRepository.checkAvailableStock(
-        productId: item.product.id,
-        size: item.selectedSize,
-        colorNameEn: item.selectedColor.nameEn,
-      );
+      final actualPrice = trustedProduct?.priceUsd ?? item.product.priceUsd;
+      final availableStock = trustedProduct?.stockQuantity ??
+          await _productRepository.checkAvailableStock(
+            productId: item.product.id,
+            size: item.selectedSize,
+            colorNameEn: item.selectedColor.nameEn,
+          );
 
       if (availableStock < item.quantity) {
         throw Exception(
@@ -115,7 +125,16 @@ class OrderRepository {
       }
 
       calculatedSubtotal += (actualPrice * item.quantity);
-      verifiedItems.add(item);
+      verifiedItems.add(
+        CartItemModel(
+          id: item.id,
+          product: trustedProduct ?? item.product,
+          selectedColor: item.selectedColor,
+          selectedSize: item.selectedSize,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        ),
+      );
     }
 
     // 2. Validate and apply coupon discount
@@ -127,10 +146,10 @@ class OrderRepository {
       }
     }
 
-    // 3. Compute delivery fee ($2.50 or Free if subtotal >= $50)
-    final deliveryFeeUsd = calculatedSubtotal >= AppConstants.freeShippingThresholdUsd
-        ? 0.0
-        : AppConstants.standardShippingFeeUsd;
+    // 3. Compute delivery fee
+    final threshold = freeShippingThresholdUsd ?? AppConstants.freeShippingThresholdUsd;
+    final standardFee = standardShippingFeeUsd ?? AppConstants.standardShippingFeeUsd;
+    final deliveryFeeUsd = calculatedSubtotal >= threshold ? 0.0 : standardFee;
 
     final totalUsd = (calculatedSubtotal - discountUsd) + deliveryFeeUsd;
 

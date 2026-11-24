@@ -8,6 +8,7 @@ import 'package:style_house/core/localization/language_provider.dart';
 import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
 import 'package:style_house/data/models/product_model.dart';
+import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/cart_provider.dart';
 import 'package:style_house/presentation/providers/products_provider.dart';
 import 'package:style_house/presentation/providers/wishlist_provider.dart';
@@ -30,7 +31,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   final PageController _imageController = PageController();
   late ProductColor _selectedColor;
   late String _selectedSize;
-  final int _quantity = 1;
+  int _quantity = 1;
 
   @override
   void initState() {
@@ -142,6 +143,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     final isKhmer = tr.isKhmer;
     final currency = ref.watch(currencyProvider);
     final product = ref.watch(productDetailProvider(widget.productId));
+    final isAdminUnlocked = ref.watch(adminAuthProvider).isUnlocked;
 
     if (product == null) {
       return Scaffold(
@@ -360,6 +362,31 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                       ),
                     ],
                   ),
+                  if (isAdminUnlocked) ...[
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: () => context.push('/admin/products'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.canvasLinen,
+                          border: Border.all(color: AppColors.primaryBlack, width: 0.7),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.edit_note, size: 16, color: AppColors.primaryBlack),
+                            SizedBox(width: 6),
+                            Text(
+                              'Owner Quick Edit (Price / Stock)',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   const Divider(),
                   Text(
@@ -464,6 +491,52 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         ),
                       );
                     }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isKhmer ? 'ចំនួន' : 'Quantity',
+                        style: AppTypography.titleSmall(isKhmer: isKhmer, color: AppColors.textPrimary).copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.borderMedium),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.remove, size: 16),
+                              onPressed: _quantity > 1
+                                  ? () => setState(() => _quantity--)
+                                  : null,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                '$_quantity',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.add, size: 16),
+                              onPressed: _quantity < product.stockQuantity
+                                  ? () => setState(() => _quantity++)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   const Divider(),

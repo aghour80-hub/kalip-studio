@@ -13,6 +13,8 @@ enum AppCurrency {
 }
 
 class CurrencyFormatter {
+  static double liveExchangeRate = AppConstants.usdToKhrRate;
+
   static final NumberFormat _usdFormat = NumberFormat.currency(
     symbol: '\$',
     decimalDigits: 2,
@@ -25,9 +27,10 @@ class CurrencyFormatter {
   );
 
   /// Convert USD amount to current currency and format it
-  static String format(double amountInUsd, AppCurrency currency) {
+  static String format(double amountInUsd, AppCurrency currency, {double? rate}) {
+    final activeRate = rate ?? liveExchangeRate;
     if (currency == AppCurrency.khr) {
-      final khrAmount = amountInUsd * AppConstants.usdToKhrRate;
+      final khrAmount = amountInUsd * activeRate;
       // Round to nearest 100 Riels (standard Cambodian cash & QR practice)
       final roundedKhr = (khrAmount / 100).round() * 100;
       return _khrFormat.format(roundedKhr);
@@ -36,9 +39,10 @@ class CurrencyFormatter {
   }
 
   /// Show dual price display (e.g. "$120.00 ≈ 492,000 ៛") for maximum Cambodian transparency
-  static String formatDual(double amountInUsd) {
+  static String formatDual(double amountInUsd, {double? rate}) {
+    final activeRate = rate ?? liveExchangeRate;
     final usd = _usdFormat.format(amountInUsd);
-    final khr = _khrFormat.format((amountInUsd * AppConstants.usdToKhrRate / 100).round() * 100);
+    final khr = _khrFormat.format((amountInUsd * activeRate / 100).round() * 100);
     return '$usd (≈ $khr)';
   }
 }

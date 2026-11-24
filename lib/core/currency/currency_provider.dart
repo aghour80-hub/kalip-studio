@@ -11,8 +11,9 @@ class CurrencyNotifier extends StateNotifier<AppCurrency> {
   Future<void> _loadCurrency() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
       final code = prefs.getString(AppConstants.keyCurrency);
-      if (code != null) {
+      if (code != null && mounted) {
         state = AppCurrency.values.firstWhere(
           (c) => c.code == code,
           orElse: () => AppCurrency.usd,

@@ -53,10 +53,17 @@ class CartItemModel {
     );
   }
 
+  factory CartItemModel.fromStoredJson(Map<String, dynamic> json) {
+    final productJson = json['product'] as Map<String, dynamic>;
+    final product = ProductModel.fromJson(productJson);
+    return CartItemModel.fromJson(json, product);
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'product_id': product.id,
+      'product': product.toJson(),
       'variant_id': variantId,
       'selected_color': selectedColor.toJson(),
       'selected_size': selectedSize,

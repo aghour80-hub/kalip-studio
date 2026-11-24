@@ -12,8 +12,9 @@ class LanguageNotifier extends StateNotifier<String> {
   Future<void> _loadLanguage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
       final savedLang = prefs.getString(AppConstants.keyLanguage);
-      if (savedLang != null) {
+      if (savedLang != null && mounted) {
         state = savedLang;
       }
     } catch (_) {}

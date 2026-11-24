@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:style_house/data/mock/sample_data.dart';
 import 'package:style_house/data/models/category_model.dart';
 import 'package:style_house/data/models/product_model.dart';
 import 'package:style_house/data/repositories/category_repository.dart';
 import 'package:style_house/data/repositories/product_repository.dart';
+import 'package:style_house/presentation/providers/admin_provider.dart';
 
 enum ProductSortOption {
   featured,
@@ -87,7 +87,15 @@ final categoriesListProvider = FutureProvider<List<CategoryModel>>((ref) async {
 });
 
 final allProductsProvider = Provider<List<ProductModel>>((ref) {
-  return SampleData.products;
+  return ref
+      .watch(adminProductsProvider)
+      .products
+      .where((p) => p.isActive)
+      .toList();
+});
+
+final onSaleProductsProvider = Provider<List<ProductModel>>((ref) {
+  return ref.watch(allProductsProvider).where((p) => p.hasDiscount).toList();
 });
 
 final filteredProductsProvider = Provider<List<ProductModel>>((ref) {

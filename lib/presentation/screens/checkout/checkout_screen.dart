@@ -7,6 +7,7 @@ import 'package:style_house/core/localization/language_provider.dart';
 import 'package:style_house/core/payment/cod_service.dart';
 import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
+import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/presentation/providers/ai_chat_provider.dart';
 import 'package:style_house/presentation/providers/auth_provider.dart';
 import 'package:style_house/presentation/providers/cart_provider.dart';
@@ -24,10 +25,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Form Controllers
-  final _nameController = TextEditingController(text: 'Seng Hour');
-  final _phoneController = TextEditingController(text: '092 888 999');
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
   final _addressController = TextEditingController(text: 'Street 302, Sangkat Boeng Keng Kang 1');
   final _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(authProvider).user;
+    _nameController = TextEditingController(text: user?.fullName ?? 'Seng Hour');
+    _phoneController = TextEditingController(text: user?.phoneNumber ?? '092 888 999');
+  }
 
   String _selectedProvince = 'Phnom Penh';
   String _selectedDistrict = 'Chamkar Mon / BKK';
@@ -98,6 +107,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             context,
             order: newOrder,
             onPaymentSuccess: () {
+              ref.read(ordersProvider.notifier).updateOrderStatus(
+                    newOrder.orderNumber,
+                    OrderStatus.confirmed,
+                  );
               if (mounted) {
                 context.go('/order-success/${newOrder.orderNumber}');
               }

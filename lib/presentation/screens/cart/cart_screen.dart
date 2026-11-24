@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/core/currency/currency_formatter.dart';
 import 'package:style_house/core/currency/currency_provider.dart';
 import 'package:style_house/core/localization/language_provider.dart';
@@ -99,7 +98,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: (cartState.subtotalUsd / AppConstants.freeShippingThresholdUsd).clamp(0.0, 1.0),
+                            value: (cartState.subtotalUsd / cartState.freeShippingThresholdUsd).clamp(0.0, 1.0),
                             backgroundColor: AppColors.warmSand,
                             valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlack),
                             minHeight: 4,
@@ -247,6 +246,32 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           child: Text(tr.tr('apply')),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final code in ['STYLE10 (-10%)', 'VIP10 (-10%)', 'LUXURY20 (-20%)'])
+                        InkWell(
+                          onTap: () {
+                            _promoController.text = code.split(' ').first;
+                            _applyPromo(isKhmer);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.canvasLinen,
+                              border: Border.all(color: AppColors.borderLight),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              code,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primaryBlack),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                   if (_promoMessage != null) ...[

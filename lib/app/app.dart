@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:style_house/core/localization/language_provider.dart';
 import 'package:style_house/core/router/app_router.dart';
 import 'package:style_house/core/theme/app_theme.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 
 /// The root application widget for KALIP studio.
 ///
@@ -13,6 +14,7 @@ class StyleHouseApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(storeSettingsProvider);
     final router = ref.watch(appRouterProvider);
     final isKhmer = ref.watch(localizationProvider).isKhmer;
 

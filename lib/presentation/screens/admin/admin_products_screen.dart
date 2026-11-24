@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
 import 'package:style_house/data/models/product_model.dart';
+import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/admin_provider.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/luxury_image.dart';
 
 class AdminProductsScreen extends ConsumerStatefulWidget {
@@ -17,10 +18,45 @@ class AdminProductsScreen extends ConsumerStatefulWidget {
 
 class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
   String _searchQuery = '';
-  String _selectedGender = 'all';
+  String _selectedFilter = 'all';
 
-  // 1. QUICK PRICE CHANGE DIALOG
-  void _showQuickPriceDialog(BuildContext context, ProductModel product) {
+  static const List<String> _presetImages = [
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1595777457583-95e059d581b8?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop',
+  ];
+
+  static const List<String> _validCategories = [
+    'women',
+    'men',
+    'tailoring',
+    'bags',
+    'footwear',
+    'accessories',
+    'dresses',
+    'tops',
+    'outerwear',
+    'pants',
+  ];
+
+  static const List<DropdownMenuItem<String>> _categoryDropdownItems = [
+    DropdownMenuItem(value: 'women', child: Text('Women Collection')),
+    DropdownMenuItem(value: 'men', child: Text('Men Collection')),
+    DropdownMenuItem(value: 'tailoring', child: Text('Tailoring & Blazers')),
+    DropdownMenuItem(value: 'dresses', child: Text('Dresses')),
+    DropdownMenuItem(value: 'tops', child: Text('Tops & Shirts')),
+    DropdownMenuItem(value: 'outerwear', child: Text('Outerwear')),
+    DropdownMenuItem(value: 'pants', child: Text('Pants')),
+    DropdownMenuItem(value: 'bags', child: Text('Leather Bags')),
+    DropdownMenuItem(value: 'footwear', child: Text('Footwear')),
+    DropdownMenuItem(value: 'accessories', child: Text('Silk & Accessories')),
+  ];
+
+  // 1. QUICK PRICE & DISCOUNT DIALOG
+  void _showQuickPriceDialog(BuildContext context, ProductModel product, double khrRate) {
     final priceController = TextEditingController(text: product.priceUsd.toStringAsFixed(2));
     final originalPriceController = TextEditingController(
       text: product.originalPriceUsd != null ? product.originalPriceUsd!.toStringAsFixed(2) : '',
@@ -31,7 +67,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final currentInputPrice = double.tryParse(priceController.text) ?? product.priceUsd;
-          final khrEquivalent = (currentInputPrice * AppConstants.usdToKhrRate).toStringAsFixed(0);
+          final khrEquivalent = ((currentInputPrice * khrRate) / 100).round() * 100;
 
           return AlertDialog(
             backgroundColor: AppColors.pureWhite,
@@ -56,9 +92,8 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     product.nameEn,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // Selling Price (USD)
                   const Text(
                     'Selling Price (USD):',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryBlack),
@@ -78,14 +113,13 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '≈ $khrEquivalent ៛ KHR (at rate 1 USD = 4,100 KHR)',
+                    '≈ ${khrEquivalent.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")} ៛ KHR (Rate: ${khrRate.toInt()})',
                     style: const TextStyle(fontSize: 11, color: AppColors.luxuryBeigeDark, fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // Original Price (USD) for Discount Badge
                   const Text(
-                    'Original Price / MSRP (USD) (Optional):',
+                    'Original Price / MSRP (USD) — Leave blank to remove sale:',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 6),
@@ -94,12 +128,54 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       prefixText: '\$ ',
-                      hintText: 'Leave empty if no discount',
+                      hintText: 'Empty = regular price',
                       filled: true,
                       fillColor: AppColors.canvasLinen,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
+                      suffixIcon: originalPriceController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              onPressed: () {
+                                setDialogState(() => originalPriceController.clear());
+                              },
+                            )
+                          : null,
                     ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Quick Discount Presets:',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      ActionChip(
+                        label: const Text('Clear Sale', style: TextStyle(fontSize: 10)),
+                        onPressed: () {
+                          final base = double.tryParse(originalPriceController.text) ?? currentInputPrice;
+                          setDialogState(() {
+                            priceController.text = base.toStringAsFixed(2);
+                            originalPriceController.clear();
+                          });
+                        },
+                      ),
+                      for (final pct in [10, 20, 30])
+                        ActionChip(
+                          label: Text('-$pct%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            final base = double.tryParse(originalPriceController.text) ?? currentInputPrice;
+                            final discounted = base * (1 - pct / 100);
+                            setDialogState(() {
+                              originalPriceController.text = base.toStringAsFixed(2);
+                              priceController.text = discounted.toStringAsFixed(2);
+                            });
+                          },
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -118,18 +194,20 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     );
                     return;
                   }
-                  final newOrigPrice = double.tryParse(originalPriceController.text);
+                  final rawOrig = originalPriceController.text.trim();
+                  final newOrigPrice = rawOrig.isEmpty ? null : double.tryParse(rawOrig);
 
                   ref.read(adminProductsProvider.notifier).updatePrice(
                         product.id,
                         newPrice,
                         newOriginalPriceUsd: newOrigPrice,
+                        clearOriginalPrice: rawOrig.isEmpty || newOrigPrice == null || newOrigPrice <= newPrice,
                       );
 
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Updated price for "${product.nameEn}" to \$${newPrice.toStringAsFixed(2)}'),
+                      content: Text('Updated "${product.nameEn}" to \$${newPrice.toStringAsFixed(2)} USD (synced to Boutique)'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -154,8 +232,11 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
     final stockController = TextEditingController(text: product.stockQuantity.toString());
     final descEnController = TextEditingController(text: product.descriptionEn);
     final imageController = TextEditingController(text: product.images.first);
-    String selectedCat = product.categoryId;
-    String selectedGender = product.gender;
+    String selectedCat = _validCategories.contains(product.categoryId) ? product.categoryId : 'dresses';
+    String selectedGender = ['women', 'men', 'unisex'].contains(product.gender) ? product.gender : 'women';
+    bool isActive = product.isActive;
+    bool isNewArrival = product.isNewArrival;
+    bool isBestSeller = product.isBestSeller;
 
     showDialog(
       context: context,
@@ -167,7 +248,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
               children: [
                 const Icon(Icons.edit_note_outlined, color: AppColors.primaryBlack),
                 const SizedBox(width: 8),
-                Text('Edit Product Details', style: AppTypography.titleMedium()),
+                Expanded(child: Text('Edit Product Details', style: AppTypography.titleMedium())),
               ],
             ),
             content: SizedBox(
@@ -177,7 +258,6 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // English Name
                     const Text('Product Title (English):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     TextField(
@@ -191,7 +271,6 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Khmer Name
                     const Text('Product Title (Khmer):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     TextField(
@@ -205,7 +284,6 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Price & Stock Row
                     Row(
                       children: [
                         Expanded(
@@ -228,12 +306,12 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Original Price (USD):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('MSRP (USD):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               TextField(
                                 controller: originalPriceController,
@@ -250,12 +328,12 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Stock Units:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('Stock:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               TextField(
                                 controller: stockController,
@@ -274,7 +352,6 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Category & Gender Row
                     Row(
                       children: [
                         Expanded(
@@ -291,14 +368,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
                                 ),
-                                items: const [
-                                  DropdownMenuItem(value: 'dresses', child: Text('Dresses')),
-                                  DropdownMenuItem(value: 'tops', child: Text('Tops & Shirts')),
-                                  DropdownMenuItem(value: 'outerwear', child: Text('Outerwear')),
-                                  DropdownMenuItem(value: 'pants', child: Text('Pants & Tailoring')),
-                                  DropdownMenuItem(value: 'bags', child: Text('Bags')),
-                                  DropdownMenuItem(value: 'accessories', child: Text('Accessories')),
-                                ],
+                                items: _categoryDropdownItems,
                                 onChanged: (val) {
                                   if (val != null) setDialogState(() => selectedCat = val);
                                 },
@@ -311,7 +381,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Gender Collection:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('Collection:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               DropdownButtonFormField<String>(
                                 initialValue: selectedGender,
@@ -337,9 +407,36 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Image URL
-                    const Text('Image URL (Web):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    // Curated Image Picker + URL Input
+                    const Text('Product Photo (Pick Preset or Paste URL):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 52,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _presetImages.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, idx) {
+                          final url = _presetImages[idx];
+                          final isSelected = imageController.text.trim() == url;
+                          return InkWell(
+                            onTap: () => setDialogState(() => imageController.text = url),
+                            child: Container(
+                              width: 44,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primaryBlack : AppColors.borderLight,
+                                  width: isSelected ? 2 : 0.8,
+                                ),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: LuxuryImage(imageUrl: url, fit: BoxFit.cover),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: imageController,
                       decoration: InputDecoration(
@@ -351,18 +448,39 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Description
                     const Text('Description (English):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     TextField(
                       controller: descEnController,
-                      maxLines: 3,
+                      maxLines: 2,
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: AppColors.canvasLinen,
                         contentPadding: const EdgeInsets.all(12),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilterChip(
+                          label: const Text('Visible in Shop', style: TextStyle(fontSize: 11)),
+                          selected: isActive,
+                          onSelected: (v) => setDialogState(() => isActive = v),
+                        ),
+                        FilterChip(
+                          label: const Text('New Arrival', style: TextStyle(fontSize: 11)),
+                          selected: isNewArrival,
+                          onSelected: (v) => setDialogState(() => isNewArrival = v),
+                        ),
+                        FilterChip(
+                          label: const Text('Best Seller', style: TextStyle(fontSize: 11)),
+                          selected: isBestSeller,
+                          onSelected: (v) => setDialogState(() => isBestSeller = v),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -376,7 +494,8 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
               ElevatedButton(
                 onPressed: () {
                   final newPrice = double.tryParse(priceController.text) ?? product.priceUsd;
-                  final newOrigPrice = double.tryParse(originalPriceController.text);
+                  final rawOrig = originalPriceController.text.trim();
+                  final newOrigPrice = rawOrig.isEmpty ? null : double.tryParse(rawOrig);
                   final newStock = int.tryParse(stockController.text) ?? product.stockQuantity;
 
                   final updated = product.copyWith(
@@ -384,9 +503,13 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     nameKm: nameKmController.text.trim().isEmpty ? product.nameKm : nameKmController.text.trim(),
                     priceUsd: newPrice,
                     originalPriceUsd: newOrigPrice,
+                    clearOriginalPrice: rawOrig.isEmpty || newOrigPrice == null || newOrigPrice <= newPrice,
                     stockQuantity: newStock,
                     categoryId: selectedCat,
                     gender: selectedGender,
+                    isActive: isActive,
+                    isNewArrival: isNewArrival,
+                    isBestSeller: isBestSeller,
                     descriptionEn: descEnController.text.trim(),
                     images: imageController.text.trim().isNotEmpty
                         ? [imageController.text.trim(), ...product.images.skip(1)]
@@ -397,7 +520,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Successfully updated "${updated.nameEn}".'),
+                      content: Text('Updated "${updated.nameEn}" & synced to Storefront.'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -419,11 +542,11 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
     final originalPriceController = TextEditingController();
     final stockController = TextEditingController(text: '20');
     final descEnController = TextEditingController();
-    final imageController = TextEditingController(
-      text: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=800&auto=format&fit=crop',
-    );
+    final imageController = TextEditingController(text: _presetImages.first);
     String selectedCat = 'dresses';
     String selectedGender = 'women';
+    bool isNewArrival = true;
+    bool isBestSeller = false;
 
     showDialog(
       context: context,
@@ -435,7 +558,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
               children: [
                 const Icon(Icons.add_circle_outline, color: AppColors.luxuryBeigeDark),
                 const SizedBox(width: 8),
-                Text('Add New Fashion Product', style: AppTypography.titleMedium()),
+                Expanded(child: Text('Add New Fashion Product', style: AppTypography.titleMedium())),
               ],
             ),
             content: SizedBox(
@@ -459,7 +582,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    const Text('Product Title (Khmer):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    const Text('Product Title (Khmer - Optional):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     TextField(
                       controller: nameKmController,
@@ -496,12 +619,12 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Original Price (USD):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('MSRP (USD):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               TextField(
                                 controller: originalPriceController,
@@ -518,12 +641,12 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Stock Units:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('Stock:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               TextField(
                                 controller: stockController,
@@ -558,14 +681,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
                                 ),
-                                items: const [
-                                  DropdownMenuItem(value: 'dresses', child: Text('Dresses')),
-                                  DropdownMenuItem(value: 'tops', child: Text('Tops & Shirts')),
-                                  DropdownMenuItem(value: 'outerwear', child: Text('Outerwear')),
-                                  DropdownMenuItem(value: 'pants', child: Text('Pants & Tailoring')),
-                                  DropdownMenuItem(value: 'bags', child: Text('Bags')),
-                                  DropdownMenuItem(value: 'accessories', child: Text('Accessories')),
-                                ],
+                                items: _categoryDropdownItems,
                                 onChanged: (val) {
                                   if (val != null) setDialogState(() => selectedCat = val);
                                 },
@@ -578,7 +694,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Gender Collection:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('Collection:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               DropdownButtonFormField<String>(
                                 initialValue: selectedGender,
@@ -604,8 +720,35 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    const Text('Image URL:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    const Text('Choose Studio Photo or Paste URL:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 52,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _presetImages.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, idx) {
+                          final url = _presetImages[idx];
+                          final isSelected = imageController.text.trim() == url;
+                          return InkWell(
+                            onTap: () => setDialogState(() => imageController.text = url),
+                            child: Container(
+                              width: 44,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primaryBlack : AppColors.borderLight,
+                                  width: isSelected ? 2 : 0.8,
+                                ),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: LuxuryImage(imageUrl: url, fit: BoxFit.cover),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: imageController,
                       decoration: InputDecoration(
@@ -629,6 +772,22 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                         contentPadding: const EdgeInsets.all(12),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilterChip(
+                          label: const Text('Show in New Arrivals', style: TextStyle(fontSize: 11)),
+                          selected: isNewArrival,
+                          onSelected: (v) => setDialogState(() => isNewArrival = v),
+                        ),
+                        FilterChip(
+                          label: const Text('Show in Best Sellers', style: TextStyle(fontSize: 11)),
+                          selected: isBestSeller,
+                          onSelected: (v) => setDialogState(() => isBestSeller = v),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -661,7 +820,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                         : 'Handcrafted luxury apparel from KALIP studio BKK1 atelier.',
                     descriptionKm: 'សម្លៀកបំពាក់ម៉ូដប្រណីតពី KALIP studio ភ្នំពេញ',
                     priceUsd: price,
-                    originalPriceUsd: origPrice,
+                    originalPriceUsd: (origPrice != null && origPrice > price) ? origPrice : null,
                     categoryId: selectedCat,
                     gender: selectedGender,
                     colors: [
@@ -672,10 +831,12 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     images: [
                       imageController.text.trim().isNotEmpty
                           ? imageController.text.trim()
-                          : 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=800&auto=format&fit=crop',
+                          : _presetImages.first,
                     ],
                     stockQuantity: stock,
-                    isNewArrival: true,
+                    isNewArrival: isNewArrival,
+                    isBestSeller: isBestSeller,
+                    isActive: true,
                     detailsEn: ['Designed in Phnom Penh Atelier', 'Dry clean recommended'],
                     detailsKm: ['រចនាយ៉ាងពិសេសនៅភ្នំពេញ'],
                     materialEn: 'Cambodian Silk & Linen Blend',
@@ -686,7 +847,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Created new product "${newProd.nameEn}".'),
+                      content: Text('Published "${newProd.nameEn}" live to KALIP studio boutique!'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -706,8 +867,8 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.pureWhite,
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.warning_amber_rounded, color: AppColors.error),
             SizedBox(width: 8),
             Text('Delete Product'),
@@ -834,11 +995,19 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final products = ref.watch(adminProductsProvider).products;
+    final khrRate = ref.watch(storeSettingsProvider).usdToKhrRate;
 
     final filtered = products.where((p) {
-      if (_selectedGender != 'all' && p.gender != _selectedGender && p.gender != 'unisex') {
-        return false;
+      if (_selectedFilter == 'women' || _selectedFilter == 'men' || _selectedFilter == 'unisex') {
+        if (p.gender != _selectedFilter && p.gender != 'unisex') return false;
+      } else if (_selectedFilter == 'low_stock') {
+        if (p.stockQuantity > 5) return false;
+      } else if (_selectedFilter == 'on_sale') {
+        if (!p.hasDiscount) return false;
+      } else if (_selectedFilter == 'hidden') {
+        if (p.isActive) return false;
       }
+
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         return p.nameEn.toLowerCase().contains(q) ||
@@ -850,12 +1019,13 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
 
     final totalStockUnits = products.fold<int>(0, (sum, p) => sum + p.stockQuantity);
     final lowStockCount = products.where((p) => p.isLowStock || p.stockQuantity <= 5).length;
+    final hiddenCount = products.where((p) => !p.isActive).length;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          tooltip: 'Quay lại cửa hàng / Return to Store',
+          tooltip: 'Back to Boutique',
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -866,46 +1036,59 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
         ),
         title: const Text(
           'CATALOG & PRICING',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.storefront_outlined, size: 21),
-            tooltip: 'Trang chủ Boutique',
-            onPressed: () => context.go('/'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.dashboard_outlined, size: 21),
+            icon: const Icon(Icons.dashboard_outlined, size: 20),
             tooltip: 'Admin Dashboard',
             onPressed: () => context.push('/admin'),
           ),
-          const SizedBox(width: 4),
-          TextButton.icon(
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primaryBlack,
-              backgroundColor: AppColors.luxuryBeige,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            ),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text(
-              'ADD PRODUCT',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8),
-            ),
-            onPressed: () => _showAddProductDialog(context),
+          IconButton(
+            icon: const Icon(Icons.lock_outline, size: 20, color: AppColors.error),
+            tooltip: 'Lock Owner Portal',
+            onPressed: () {
+              ref.read(adminAuthProvider.notifier).lockPortal();
+              context.go('/');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Owner Mode Locked (Đã khóa trang Chủ hàng)')),
+              );
+            },
           ),
-          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.storefront_outlined, size: 20),
+            tooltip: 'Boutique Storefront',
+            onPressed: () => context.go('/'),
+          ),
+          const SizedBox(width: 2),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryBlack,
+                backgroundColor: AppColors.luxuryBeige,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              ),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text(
+                'ADD',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8),
+              ),
+              onPressed: () => _showAddProductDialog(context),
+            ),
+          ),
         ],
       ),
       body: Column(
         children: [
           // 1. TOP METRICS STRIP
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             color: AppColors.primaryBlack,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSummaryItem('TOTAL ITEMS', '${products.length}', AppColors.pureWhite),
+                _buildSummaryItem('ITEMS', '${products.length} ($hiddenCount Hidden)', AppColors.pureWhite),
                 Container(width: 1, height: 24, color: Colors.white24),
                 _buildSummaryItem('TOTAL STOCK', '$totalStockUnits Units', AppColors.luxuryBeige),
                 Container(width: 1, height: 24, color: Colors.white24),
@@ -918,7 +1101,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
             ),
           ),
 
-          // 2. SEARCH & GENDER FILTER TOOLBAR
+          // 2. SEARCH & FILTER TOOLBAR
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             color: AppColors.canvasLinen,
@@ -926,7 +1109,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
               children: [
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Search by product name, category, or SKU...',
+                    hintText: 'Search by product name or category...',
                     prefixIcon: const Icon(Icons.search, size: 20),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     filled: true,
@@ -942,23 +1125,30 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: ['all', 'women', 'men', 'unisex'].map((gender) {
-                      final isSel = _selectedGender == gender;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(gender.toUpperCase()),
-                          selected: isSel,
-                          selectedColor: AppColors.primaryBlack,
-                          labelStyle: TextStyle(
-                            color: isSel ? AppColors.pureWhite : AppColors.primaryBlack,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
+                    children: [
+                      for (final chip in [
+                        {'id': 'all', 'label': 'ALL'},
+                        {'id': 'women', 'label': 'WOMEN'},
+                        {'id': 'men', 'label': 'MEN'},
+                        {'id': 'low_stock', 'label': 'LOW STOCK'},
+                        {'id': 'on_sale', 'label': 'ON SALE'},
+                        {'id': 'hidden', 'label': 'HIDDEN ($hiddenCount)'},
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(chip['label']!),
+                            selected: _selectedFilter == chip['id'],
+                            selectedColor: AppColors.primaryBlack,
+                            labelStyle: TextStyle(
+                              color: _selectedFilter == chip['id'] ? AppColors.pureWhite : AppColors.primaryBlack,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                            onSelected: (_) => setState(() => _selectedFilter = chip['id']!),
                           ),
-                          onSelected: (_) => setState(() => _selectedGender = gender),
                         ),
-                      );
-                    }).toList(),
+                    ],
                   ),
                 ),
               ],
@@ -993,185 +1183,214 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     itemBuilder: (context, index) {
                       final product = filtered[index];
                       final isLow = product.isLowStock || product.stockQuantity <= 5;
-                      final khrPrice = (product.priceUsd * AppConstants.usdToKhrRate).toStringAsFixed(0);
+                      final khrPrice = ((product.priceUsd * khrRate) / 100).round() * 100;
+                      final khrFormatted = khrPrice.toString().replaceAllMapped(
+                        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                        (m) => '${m[1]},',
+                      );
 
-                      return Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.pureWhite,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.borderLight),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                      return Opacity(
+                        opacity: product.isActive ? 1.0 : 0.65,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.pureWhite,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: product.isActive ? AppColors.borderLight : AppColors.error.withValues(alpha: 0.4),
                             ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Thumbnail
-                                SizedBox(
-                                  width: 64,
-                                  height: 80,
-                                  child: LuxuryImage(
-                                    imageUrl: product.images.first,
-                                    borderRadius: BorderRadius.circular(2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: 64,
+                                    height: 80,
+                                    child: LuxuryImage(
+                                      imageUrl: product.images.first,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 14),
-
-                                // Product info
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.nameEn,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        product.nameKm,
-                                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
-
-                                      // Price Row (USD + KHR)
-                                      Row(
-                                        children: [
-                                          Text(
-                                            '\$${product.priceUsd.toStringAsFixed(2)} USD',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                              color: AppColors.primaryBlack,
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                product.nameEn,
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ),
-                                          ),
-                                          if (product.hasDiscount) ...[
-                                            const SizedBox(width: 6),
+                                            if (!product.isActive)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                color: AppColors.error,
+                                                child: const Text(
+                                                  'HIDDEN',
+                                                  style: TextStyle(color: AppColors.pureWhite, fontSize: 8, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          product.nameKm,
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+
+                                        // Price Row (USD + KHR)
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 2,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
                                             Text(
-                                              '\$${product.originalPriceUsd!.toStringAsFixed(2)}',
+                                              '\$${product.priceUsd.toStringAsFixed(2)} USD',
                                               style: const TextStyle(
-                                                fontSize: 10,
-                                                decoration: TextDecoration.lineThrough,
-                                                color: AppColors.textMuted,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13,
+                                                color: AppColors.primaryBlack,
+                                              ),
+                                            ),
+                                            if (product.hasDiscount)
+                                              Text(
+                                                '\$${product.originalPriceUsd!.toStringAsFixed(2)}',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  decoration: TextDecoration.lineThrough,
+                                                  color: AppColors.textMuted,
+                                                ),
+                                              ),
+                                            Text(
+                                              '≈ $khrFormatted ៛',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.luxuryBeigeDark,
+                                                fontWeight: FontWeight.w600,
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            '≈ $khrPrice ៛',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: AppColors.luxuryBeigeDark,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
+                                        ),
+                                        const SizedBox(height: 6),
 
-                                      // Stock & Category Badges
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            color: isLow
-                                                ? AppColors.warning.withValues(alpha: 0.15)
-                                                : AppColors.success.withValues(alpha: 0.15),
-                                            child: Text(
-                                              '${product.stockQuantity} IN STOCK',
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: isLow ? AppColors.warning : AppColors.success,
+                                        // Stock & Category Badges
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              color: isLow
+                                                  ? AppColors.warning.withValues(alpha: 0.15)
+                                                  : AppColors.success.withValues(alpha: 0.15),
+                                              child: Text(
+                                                '${product.stockQuantity} IN STOCK',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isLow ? AppColors.warning : AppColors.success,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            color: AppColors.canvasLinen,
-                                            child: Text(
-                                              '${product.gender.toUpperCase()} • ${product.categoryId.toUpperCase()}',
-                                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              color: AppColors.canvasLinen,
+                                              child: Text(
+                                                '${product.gender.toUpperCase()} • ${product.categoryId.toUpperCase()}',
+                                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const Divider(height: 18, thickness: 0.7, color: AppColors.borderLight),
+
+                              // Action Buttons Row (Responsive Wrap - zero overflow on mobile)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  alignment: WrapAlignment.end,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        minimumSize: const Size(0, 32),
                                       ),
-                                    ],
-                                  ),
+                                      icon: const Icon(Icons.price_change_outlined, size: 14),
+                                      label: const Text('Price', style: TextStyle(fontSize: 11)),
+                                      onPressed: () => _showQuickPriceDialog(context, product, khrRate),
+                                    ),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        minimumSize: const Size(0, 32),
+                                      ),
+                                      icon: const Icon(Icons.edit_note_outlined, size: 14),
+                                      label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                                      onPressed: () => _showEditProductDialog(context, product),
+                                    ),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        minimumSize: const Size(0, 32),
+                                      ),
+                                      icon: const Icon(Icons.add_box_outlined, size: 14),
+                                      label: const Text('Restock', style: TextStyle(fontSize: 11)),
+                                      onPressed: () => _showRestockDialog(
+                                        context,
+                                        product.id,
+                                        product.nameEn,
+                                        product.stockQuantity,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        product.isActive ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                        size: 18,
+                                        color: product.isActive ? AppColors.primaryBlack : AppColors.textMuted,
+                                      ),
+                                      tooltip: product.isActive ? 'Hide from Storefront' : 'Publish to Storefront',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () {
+                                        ref.read(adminProductsProvider.notifier).toggleProductStatus(product.id);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                      tooltip: 'Delete Product',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => _showDeleteDialog(context, product),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-
-                            const Divider(height: 20, thickness: 0.7, color: AppColors.borderLight),
-
-                            // Action Buttons Row (English Menu)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                // 1. Quick Price Button
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    minimumSize: const Size(0, 32),
-                                  ),
-                                  icon: const Icon(Icons.price_change_outlined, size: 14),
-                                  label: const Text('Price', style: TextStyle(fontSize: 11)),
-                                  onPressed: () => _showQuickPriceDialog(context, product),
-                                ),
-                                const SizedBox(width: 6),
-
-                                // 2. Edit Details Button
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    minimumSize: const Size(0, 32),
-                                  ),
-                                  icon: const Icon(Icons.edit_note_outlined, size: 14),
-                                  label: const Text('Edit', style: TextStyle(fontSize: 11)),
-                                  onPressed: () => _showEditProductDialog(context, product),
-                                ),
-                                const SizedBox(width: 6),
-
-                                // 3. Restock Button
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    minimumSize: const Size(0, 32),
-                                  ),
-                                  icon: const Icon(Icons.add_box_outlined, size: 14),
-                                  label: const Text('Restock', style: TextStyle(fontSize: 11)),
-                                  onPressed: () => _showRestockDialog(
-                                    context,
-                                    product.id,
-                                    product.nameEn,
-                                    product.stockQuantity,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-
-                                // 4. Delete Button
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                                  tooltip: 'Delete Product',
-                                  visualDensity: VisualDensity.compact,
-                                  onPressed: () => _showDeleteDialog(context, product),
-                                ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

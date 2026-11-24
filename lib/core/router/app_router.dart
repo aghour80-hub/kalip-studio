@@ -21,6 +21,7 @@ import 'package:style_house/presentation/screens/product/product_details_screen.
 import 'package:style_house/presentation/screens/profile/profile_screen.dart';
 import 'package:style_house/presentation/screens/search/search_screen.dart';
 import 'package:style_house/presentation/screens/wishlist/wishlist_screen.dart';
+import 'package:style_house/presentation/widgets/admin_gate_wrapper.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -137,22 +138,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AdminDashboardScreen(),
+        builder: (context, state) => const AdminGateWrapper(
+          sectionTitle: 'Dashboard',
+          child: AdminDashboardScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin/products',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AdminProductsScreen(),
+        builder: (context, state) => const AdminGateWrapper(
+          sectionTitle: 'Catalog & Pricing',
+          child: AdminProductsScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin/orders',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AdminOrdersScreen(),
+        builder: (context, state) => const AdminGateWrapper(
+          sectionTitle: 'Order Fulfillment',
+          child: AdminOrdersScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin/payments',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AdminPaymentsScreen(),
+        builder: (context, state) => const AdminGateWrapper(
+          sectionTitle: 'Payment Audits',
+          child: AdminPaymentsScreen(),
+        ),
       ),
       GoRoute(
         path: '/ai-concierge',

@@ -1,22 +1,29 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/data/mock/sample_data.dart';
 import 'package:style_house/data/models/cart_item_model.dart';
 import 'package:style_house/data/models/product_model.dart';
 import 'package:style_house/data/repositories/cart_repository.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 
 class CartState {
   final List<CartItemModel> items;
   final String? promoCode;
   final double discountPercentage;
   final String? warningMessage;
+  final double freeShippingThresholdUsd;
+  final double standardShippingFeeUsd;
 
   const CartState({
     required this.items,
     this.promoCode,
     this.discountPercentage = 0.0,
     this.warningMessage,
+    this.freeShippingThresholdUsd = AppConstants.freeShippingThresholdUsd,
+    this.standardShippingFeeUsd = AppConstants.standardShippingFeeUsd,
   });
 
   int get totalItemCount => items.fold(0, (sum, item) => sum + item.quantity);
@@ -24,12 +31,11 @@ class CartState {
   double get subtotalUsd =>
       items.fold(0.0, (sum, item) => sum + item.totalPriceUsd);
 
-  bool get qualifiesForFreeDelivery =>
-      subtotalUsd >= AppConstants.freeShippingThresholdUsd;
+  bool get qualifiesForFreeDelivery => subtotalUsd >= freeShippingThresholdUsd;
 
   double get deliveryFeeUsd {
     if (items.isEmpty) return 0.0;
-    return qualifiesForFreeDelivery ? 0.0 : AppConstants.standardShippingFeeUsd;
+    return qualifiesForFreeDelivery ? 0.0 : standardShippingFeeUsd;
   }
 
   double get discountUsd => subtotalUsd * discountPercentage;
@@ -40,7 +46,7 @@ class CartState {
   }
 
   double get amountNeededForFreeDelivery {
-    final diff = AppConstants.freeShippingThresholdUsd - subtotalUsd;
+    final diff = freeShippingThresholdUsd - subtotalUsd;
     return diff > 0 ? diff : 0.0;
   }
 
@@ -49,6 +55,8 @@ class CartState {
     String? promoCode,
     double? discountPercentage,
     String? warningMessage,
+    double? freeShippingThresholdUsd,
+    double? standardShippingFeeUsd,
     bool clearPromo = false,
     bool clearWarning = false,
   }) {
@@ -57,6 +65,8 @@ class CartState {
       promoCode: clearPromo ? null : (promoCode ?? this.promoCode),
       discountPercentage: clearPromo ? 0.0 : (discountPercentage ?? this.discountPercentage),
       warningMessage: clearWarning ? null : (warningMessage ?? this.warningMessage),
+      freeShippingThresholdUsd: freeShippingThresholdUsd ?? this.freeShippingThresholdUsd,
+      standardShippingFeeUsd: standardShippingFeeUsd ?? this.standardShippingFeeUsd,
     );
   }
 }
@@ -64,9 +74,63 @@ class CartState {
 class CartNotifier extends StateNotifier<CartState> {
   final CartRepository _cartRepository;
 
-  CartNotifier({CartRepository? cartRepository})
-      : _cartRepository = cartRepository ?? CartRepository(),
-        super(CartState(items: List.from(SampleData.initialCart)));
+  CartNotifier({
+    CartRepository? cartRepository,
+    double freeShippingThresholdUsd = AppConstants.freeShippingThresholdUsd,
+    double standardShippingFeeUsd = AppConstants.standardShippingFeeUsd,
+  })  : _cartRepository = cartRepository ?? CartRepository(),
+        super(CartState(
+          items: List.from(SampleData.initialCart),
+          freeShippingThresholdUsd: freeShippingThresholdUsd,
+          standardShippingFeeUsd: standardShippingFeeUsd,
+        )) {
+    _loadPersistedCart();
+  }
+
+  Future<void> _loadPersistedCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final raw = prefs.getString(AppConstants.keyCart);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final rawItems = (decoded['items'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .where((j) => j['product'] != null)
+            .map(CartItemModel.fromStoredJson)
+            .toList();
+        final promo = decoded['promo_code'] as String?;
+        final pct = (decoded['discount_percentage'] as num?)?.toDouble() ?? 0.0;
+        if (mounted) {
+          state = state.copyWith(
+            items: rawItems,
+            promoCode: promo,
+            discountPercentage: pct,
+            clearPromo: promo == null,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload = jsonEncode({
+        'items': state.items.map((i) => i.toJson()).toList(),
+        'promo_code': state.promoCode,
+        'discount_percentage': state.discountPercentage,
+      });
+      await prefs.setString(AppConstants.keyCart, payload);
+    } catch (_) {}
+  }
+
+  void updateShippingConfig(double threshold, double fee) {
+    state = state.copyWith(
+      freeShippingThresholdUsd: threshold,
+      standardShippingFeeUsd: fee,
+    );
+  }
 
   bool addToCart(
     ProductModel product,
@@ -74,7 +138,6 @@ class CartNotifier extends StateNotifier<CartState> {
     String size, {
     int quantity = 1,
   }) {
-    // Inventory Stock Validation Check
     if (product.stockQuantity <= 0) {
       state = state.copyWith(warningMessage: 'This item is currently out of stock.');
       return false;
@@ -118,6 +181,7 @@ class CartNotifier extends StateNotifier<CartState> {
       state = state.copyWith(items: [...state.items, newItem], clearWarning: true);
       _cartRepository.addItem('default-user', newItem);
     }
+    _persistCart();
     return true;
   }
 
@@ -141,6 +205,7 @@ class CartNotifier extends StateNotifier<CartState> {
       updatedList[itemIndex] = item.copyWith(quantity: newQuantity);
       state = state.copyWith(items: updatedList, clearWarning: true);
       _cartRepository.updateQuantity('default-user', cartItemId, newQuantity);
+      _persistCart();
       return true;
     }
     return false;
@@ -152,17 +217,24 @@ class CartNotifier extends StateNotifier<CartState> {
       clearWarning: true,
     );
     _cartRepository.removeItem('default-user', cartItemId);
+    _persistCart();
   }
 
   void clearCart() {
-    state = const CartState(items: []);
+    state = state.copyWith(
+      items: [],
+      clearPromo: true,
+      clearWarning: true,
+    );
     _cartRepository.clearCart('default-user');
+    _persistCart();
   }
 
   bool applyPromoCode(String code) {
     final clean = code.trim().toUpperCase();
     if (clean == 'STYLE10' || clean == 'VIP10' || clean == 'CAMBODIA') {
       state = state.copyWith(promoCode: clean, discountPercentage: 0.10, clearWarning: true);
+      _persistCart();
       return true;
     } else if (clean == 'LUXURY20') {
       if (state.subtotalUsd < 100) {
@@ -170,6 +242,7 @@ class CartNotifier extends StateNotifier<CartState> {
         return false;
       }
       state = state.copyWith(promoCode: clean, discountPercentage: 0.20, clearWarning: true);
+      _persistCart();
       return true;
     }
     state = state.copyWith(warningMessage: 'Invalid or expired promotional code.');
@@ -178,6 +251,7 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void removePromoCode() {
     state = state.copyWith(clearPromo: true, clearWarning: true);
+    _persistCart();
   }
 }
 
@@ -187,5 +261,12 @@ final cartRepositoryProvider = Provider<CartRepository>((ref) {
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   final repository = ref.watch(cartRepositoryProvider);
-  return CartNotifier(cartRepository: repository);
+  final notifier = CartNotifier(cartRepository: repository);
+  ref.listen<StoreSettingsState>(storeSettingsProvider, (_, next) {
+    notifier.updateShippingConfig(
+      next.freeShippingThresholdUsd,
+      next.standardShippingFeeUsd,
+    );
+  });
+  return notifier;
 });

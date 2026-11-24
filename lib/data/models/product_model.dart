@@ -123,6 +123,7 @@ class ProductModel {
   final bool isNewArrival;
   final bool isBestSeller;
   final bool isFeatured;
+  final bool isActive;
   final List<String> detailsEn;
   final List<String> detailsKm;
   final String materialEn;
@@ -148,6 +149,7 @@ class ProductModel {
     this.isNewArrival = false,
     this.isBestSeller = false,
     this.isFeatured = false,
+    this.isActive = true,
     required this.detailsEn,
     required this.detailsKm,
     required this.materialEn,
@@ -176,6 +178,7 @@ class ProductModel {
     String? descriptionKm,
     double? priceUsd,
     double? originalPriceUsd,
+    bool clearOriginalPrice = false,
     String? categoryId,
     String? gender,
     List<ProductColor>? colors,
@@ -187,6 +190,7 @@ class ProductModel {
     bool? isNewArrival,
     bool? isBestSeller,
     bool? isFeatured,
+    bool? isActive,
     List<String>? detailsEn,
     List<String>? detailsKm,
     String? materialEn,
@@ -200,7 +204,7 @@ class ProductModel {
       descriptionEn: descriptionEn ?? this.descriptionEn,
       descriptionKm: descriptionKm ?? this.descriptionKm,
       priceUsd: priceUsd ?? this.priceUsd,
-      originalPriceUsd: originalPriceUsd ?? this.originalPriceUsd,
+      originalPriceUsd: clearOriginalPrice ? null : (originalPriceUsd ?? this.originalPriceUsd),
       categoryId: categoryId ?? this.categoryId,
       gender: gender ?? this.gender,
       colors: colors ?? this.colors,
@@ -212,6 +216,7 @@ class ProductModel {
       isNewArrival: isNewArrival ?? this.isNewArrival,
       isBestSeller: isBestSeller ?? this.isBestSeller,
       isFeatured: isFeatured ?? this.isFeatured,
+      isActive: isActive ?? this.isActive,
       detailsEn: detailsEn ?? this.detailsEn,
       detailsKm: detailsKm ?? this.detailsKm,
       materialEn: materialEn ?? this.materialEn,
@@ -300,6 +305,7 @@ class ProductModel {
       isNewArrival: json['is_new_arrival'] as bool? ?? false,
       isBestSeller: json['is_best_seller'] as bool? ?? false,
       isFeatured: json['is_featured'] as bool? ?? false,
+      isActive: json['is_active'] as bool? ?? true,
       detailsEn: (json['details_en'] as List<dynamic>?)
               ?.map((d) => d.toString())
               .toList() ??
@@ -331,6 +337,7 @@ class ProductModel {
       'is_new_arrival': isNewArrival,
       'is_best_seller': isBestSeller,
       'is_featured': isFeatured,
+      'is_active': isActive,
       'details_en': detailsEn,
       'details_km': detailsKm,
       'material_en': materialEn,

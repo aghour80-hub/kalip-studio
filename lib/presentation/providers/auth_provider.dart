@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/data/models/user_model.dart';
 import 'package:style_house/data/services/supabase_auth_service.dart';
 
@@ -49,7 +52,43 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final SupabaseAuthService _authService;
 
-  AuthNotifier(this._authService) : super(const AuthState());
+  AuthNotifier(this._authService) : super(const AuthState()) {
+    _loadSavedProfile();
+  }
+
+  Future<void> _loadSavedProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final raw = prefs.getString(AppConstants.keyUserProfile);
+      if (raw != null && raw.isNotEmpty) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        final user = UserModel.fromJson(map);
+        if (mounted) {
+          state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> updateProfile({
+    required String fullName,
+    String? phoneNumber,
+    String? email,
+  }) async {
+    final current = state.user;
+    if (current == null) return;
+    final updated = current.copyWith(
+      fullName: fullName.trim().isNotEmpty ? fullName.trim() : current.fullName,
+      phoneNumber: phoneNumber?.trim(),
+      email: email != null && email.trim().isNotEmpty ? email.trim() : current.email,
+    );
+    state = state.copyWith(status: AuthStatus.authenticated, user: updated);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.keyUserProfile, jsonEncode(updated.toJson()));
+    } catch (_) {}
+  }
 
   Future<bool> signIn(String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, clearError: true);

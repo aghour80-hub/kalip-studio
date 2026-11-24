@@ -6,6 +6,7 @@ import 'package:style_house/core/currency/currency_formatter.dart';
 import 'package:style_house/core/currency/currency_provider.dart';
 import 'package:style_house/core/localization/language_provider.dart';
 import 'package:style_house/core/theme/app_colors.dart';
+import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/cart_provider.dart';
 
 class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
@@ -27,6 +28,7 @@ class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
     final currentLang = ref.watch(languageProvider);
     final currentCurrency = ref.watch(currencyProvider);
     final cartCount = ref.watch(cartProvider).totalItemCount;
+    final isAdminUnlocked = ref.watch(adminAuthProvider).isUnlocked;
 
     return AppBar(
       automaticallyImplyLeading: false,
@@ -86,7 +88,9 @@ class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
             ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.search, size: 22),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          constraints: const BoxConstraints(),
+          icon: const Icon(Icons.search, size: 21),
           onPressed: () => context.push('/search'),
         ),
         InkWell(
@@ -95,7 +99,7 @@ class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
             ref.read(languageProvider.notifier).toggleLanguage();
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.borderMedium, width: 0.8),
               borderRadius: BorderRadius.circular(16),
@@ -110,14 +114,14 @@ class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
             ),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
         InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
             ref.read(currencyProvider.notifier).toggleCurrency();
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.borderMedium, width: 0.8),
               borderRadius: BorderRadius.circular(16),
@@ -133,8 +137,34 @@ class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.inventory_2_outlined, size: 21, color: AppColors.primaryBlack),
-          tooltip: 'Quản lý hàng & giá cả / Admin Catalog',
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          constraints: const BoxConstraints(),
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                isAdminUnlocked ? Icons.inventory_2_outlined : Icons.lock_outline,
+                size: 20,
+                color: isAdminUnlocked ? AppColors.success : AppColors.primaryBlack,
+              ),
+              if (isAdminUnlocked)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppColors.success,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          tooltip: isAdminUnlocked
+              ? 'Quản lý hàng & Giá cả (Đã mở khóa)'
+              : 'Quản lý Chủ hàng (Cần mật khẩu)',
           onPressed: () => context.push('/admin/products'),
         ),
         Stack(

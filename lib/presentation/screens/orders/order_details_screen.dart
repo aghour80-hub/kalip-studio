@@ -32,12 +32,13 @@ class OrderDetailsScreen extends ConsumerWidget {
       orElse: () => orders.first,
     );
 
+    final isCancelled = order.status == OrderStatus.cancelled;
     final steps = [
-      {'title': 'Order Placed', 'desc': 'Order received by STYLE HOUSE', 'done': true},
-      {'title': 'Confirmed at Atelier', 'desc': 'Verified by boutique team', 'done': true},
-      {'title': 'Preparing & Silk Wrapping', 'desc': 'Packed in luxury gift box', 'done': order.status != OrderStatus.pending},
-      {'title': 'Out for Delivery (Phnom Penh)', 'desc': 'Courier on route (${order.trackingCode})', 'done': order.status == OrderStatus.delivering || order.status == OrderStatus.delivered},
-      {'title': 'Delivered', 'desc': 'Delivered to recipient', 'done': order.status == OrderStatus.delivered},
+      {'title': 'Order Placed', 'desc': 'Order received by KALIP studio', 'done': !isCancelled},
+      {'title': 'Confirmed at Atelier', 'desc': 'Verified by boutique team', 'done': !isCancelled && order.status != OrderStatus.pending},
+      {'title': 'Preparing & Silk Wrapping', 'desc': 'Packed in luxury gift box', 'done': !isCancelled && (order.status == OrderStatus.processing || order.status == OrderStatus.delivering || order.status == OrderStatus.delivered)},
+      {'title': 'Out for Delivery (Phnom Penh)', 'desc': 'Courier on route (${order.trackingCode})', 'done': !isCancelled && (order.status == OrderStatus.delivering || order.status == OrderStatus.delivered)},
+      {'title': 'Delivered', 'desc': 'Delivered to recipient', 'done': !isCancelled && order.status == OrderStatus.delivered},
     ];
 
     return Scaffold(
@@ -304,6 +305,44 @@ class OrderDetailsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            if (order.status == OrderStatus.pending) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.error),
+                    foregroundColor: AppColors.error,
+                  ),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: Text(isKhmer ? 'បោះបង់ការបញ្ជាទិញនេះ' : 'Cancel Pending Order'),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: AppColors.pureWhite,
+                        title: Text(isKhmer ? 'បោះបង់ការបញ្ជាទិញ?' : 'Cancel Order?'),
+                        content: Text('Cancel ${order.orderNumber} and restore items to stock?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Keep Order'),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: AppColors.pureWhite),
+                            onPressed: () {
+                              ref.read(ordersProvider.notifier).cancelOrder(order.orderNumber);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Confirm Cancel'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
           ],
         ),

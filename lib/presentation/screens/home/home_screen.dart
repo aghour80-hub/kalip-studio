@@ -6,7 +6,9 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:style_house/core/localization/language_provider.dart';
 import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
+import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/products_provider.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/app_bar_header.dart';
 import 'package:style_house/presentation/widgets/luxury_image.dart';
 import 'package:style_house/presentation/widgets/product_card.dart';
@@ -62,8 +64,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final tr = ref.watch(localizationProvider);
     final isKhmer = tr.isKhmer;
+    final allProducts = ref.watch(allProductsProvider);
     final newArrivals = ref.watch(newArrivalsProvider);
     final bestSellers = ref.watch(bestSellersProvider);
+    final onSaleProducts = ref.watch(onSaleProductsProvider);
+    final isAdminUnlocked = ref.watch(adminAuthProvider).isUnlocked;
+    final storeSettings = ref.watch(storeSettingsProvider);
 
     final categoryTabs = [
       {'id': 'all', 'nameEn': 'All', 'nameKm': 'ទាំងអស់'},
@@ -73,6 +79,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       {'id': 'bags', 'nameEn': 'Bags', 'nameKm': 'កាបូប'},
       {'id': 'accessories', 'nameEn': 'Silk & Gifts', 'nameKm': 'សូត្រ & កាដូ'},
     ];
+
+    final activeCatId = categoryTabs[_activeCategoryIndex]['id']!;
+    final categoryFilteredProducts = activeCatId == 'all'
+        ? allProducts
+        : allProducts.where((p) {
+            if (activeCatId == 'women') {
+              return p.gender == 'women' || p.gender == 'unisex' || p.categoryId == 'dresses';
+            }
+            if (activeCatId == 'men') {
+              return p.gender == 'men' || p.gender == 'unisex';
+            }
+            if (activeCatId == 'tailoring') {
+              return p.categoryId == 'tailoring' || p.categoryId == 'pants' || p.categoryId == 'outerwear';
+            }
+            return p.categoryId == activeCatId;
+          }).toList();
 
     return Scaffold(
       appBar: const AppBarHeader(),
@@ -104,7 +126,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      tr.tr('express_delivery_banner'),
+                      storeSettings.customBannerNotice.trim().isNotEmpty
+                          ? storeSettings.customBannerNotice.trim()
+                          : tr.tr('express_delivery_banner'),
                       style: TextStyle(
                         color: AppColors.luxuryBeigeLight,
                         fontSize: isKhmer ? 11 : 10.5,
@@ -138,25 +162,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryBlack,
+                        color: isAdminUnlocked ? AppColors.success : AppColors.primaryBlack,
                         borderRadius: BorderRadius.circular(3),
                       ),
-                      child: const Text(
-                        'ADMIN',
-                        style: TextStyle(
-                          color: AppColors.luxuryBeige,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isAdminUnlocked ? Icons.lock_open : Icons.lock_outline,
+                            color: AppColors.pureWhite,
+                            size: 10,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAdminUnlocked ? 'ADMIN OPEN' : 'OWNER',
+                            style: const TextStyle(
+                              color: AppColors.luxuryBeigeLight,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         isKhmer
-                            ? 'គ្រប់គ្រងទំនិញ & តម្លៃ (Admin Products & Stock)'
-                            : 'Quản lý kho hàng & Giá cả (Admin Products & Stock)',
+                            ? (isAdminUnlocked
+                                ? 'គ្រប់គ្រងទំនិញ & តម្លៃ (បានដោះសោ)'
+                                : 'ចូលគ្រប់គ្រងម្ចាស់ហាង (ត្រូវការពាក្យសម្ងាត់)')
+                            : (isAdminUnlocked
+                                ? 'Quản lý kho hàng & Giá cả (Đã mở khóa)'
+                                : 'Quản lý Chủ hàng & Giá cả (Có mật khẩu)'),
                         style: TextStyle(
                           fontSize: isKhmer ? 11 : 11.5,
                           fontWeight: FontWeight.w600,
@@ -166,7 +205,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
+                    if (isAdminUnlocked) ...[
+                      InkWell(
+                        onTap: () {
+                          ref.read(adminAuthProvider.notifier).lockPortal();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đã khóa chế độ Chủ hàng (Owner Locked)')),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.error),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text(
+                            'Khóa',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -176,18 +241,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.inventory_2_outlined, color: AppColors.luxuryBeige, size: 12),
+                          Icon(
+                            isAdminUnlocked ? Icons.inventory_2_outlined : Icons.vpn_key_outlined,
+                            color: AppColors.luxuryBeige,
+                            size: 12,
+                          ),
                           const SizedBox(width: 4),
                           Text(
-                            isKhmer ? 'បើកទំព័រ' : 'Mở quản lý',
+                            isAdminUnlocked ? 'Quản lý' : 'Mở khóa',
                             style: const TextStyle(
                               color: AppColors.pureWhite,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(width: 2),
-                          const Icon(Icons.arrow_forward_ios, color: AppColors.luxuryBeige, size: 9),
                         ],
                       ),
                     ),
@@ -351,6 +418,110 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+
+          // 3b. Dynamic Filtered Collection Section when Category Chip Selected
+          if (_activeCategoryIndex != 0) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${isKhmer ? categoryTabs[_activeCategoryIndex]['nameKm'] : categoryTabs[_activeCategoryIndex]['nameEn']} (${categoryFilteredProducts.length})',
+                      style: AppTypography.headline(isKhmer: isKhmer),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _activeCategoryIndex = 0),
+                      child: Text(
+                        isKhmer ? 'សម្អាត' : 'Show All',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.luxuryBeigeDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.58,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final product = categoryFilteredProducts[index];
+                    return ProductCard(
+                      product: product,
+                      onTap: () => context.push('/product/${product.id}'),
+                    );
+                  },
+                  childCount: categoryFilteredProducts.length,
+                ),
+              ),
+            ),
+          ],
+
+          // 3c. Private Sale / Special Offers Strip (Live from Admin Discounts)
+          if (onSaleProducts.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'ATELIER PRIVILEGE • OFFERS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isKhmer ? 'ការផ្តល់ជូនពិសេស' : 'Private Sale & Offers',
+                          style: AppTypography.headline(isKhmer: isKhmer),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 280,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: onSaleProducts.length,
+                  itemBuilder: (context, index) {
+                    final product = onSaleProducts[index];
+                    return Container(
+                      width: 170,
+                      margin: const EdgeInsets.only(right: 12),
+                      child: ProductCard(
+                        product: product,
+                        onTap: () => context.push('/product/${product.id}'),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
 
           // 4. Section: New Arrivals
           SliverToBoxAdapter(
