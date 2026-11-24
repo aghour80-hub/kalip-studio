@@ -5,6 +5,15 @@ class KhqrService {
   static const String merchantCategoryCode = '5691'; // Clothing store
   static const String countryCode = 'KH';
 
+  // Official Store Owner ABA Bank Details
+  static const String abaQrAssetPath = 'assets/images/aba_khqr.jpg';
+  static const String abaBankName = 'ABA BANK';
+  static const String abaAccountName = 'SENGHOUR PRAK';
+  static const String abaAccountUsd = '000 817 811';
+  static const String abaAccountUsdRaw = '000817811';
+  static const String abaAccountKhr = '014 042 356';
+  static const String abaAccountKhrRaw = '014042356';
+
   /// Standard CRC-16 / CCITT-FALSE calculation (Polynomial 0x1021, Initial 0xFFFF)
   static String calculateCrc16(String data) {
     int crc = 0xFFFF;

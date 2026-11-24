@@ -42,6 +42,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _selectedDistrict = 'Chamkar Mon / BKK';
   String _selectedPaymentMethod = 'khqr'; // 'khqr', 'cod', 'card'
   bool _isSubmitting = false;
+  bool _orderCompleted = false;
 
   final List<String> _provinces = [
     'Phnom Penh',
@@ -99,14 +100,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // Trigger n8n automated store dispatch webhook
       ref.read(n8nWebhookServiceProvider).notifyOrderCreated(newOrder);
 
+      _orderCompleted = true;
       ref.read(cartProvider.notifier).clearCart();
 
       if (mounted) {
         if (_selectedPaymentMethod == 'khqr') {
+          var paymentConfirmed = false;
           await KhqrPaymentSheet.show(
             context,
             order: newOrder,
             onPaymentSuccess: () {
+              paymentConfirmed = true;
               ref.read(ordersProvider.notifier).updateOrderStatus(
                     newOrder.orderNumber,
                     OrderStatus.confirmed,
@@ -116,6 +120,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               }
             },
           );
+          // Even if buyer dismisses modal early, proceed cleanly to Order Success so they can reopen QR anytime
+          if (!paymentConfirmed && mounted) {
+            context.go('/order-success/${newOrder.orderNumber}');
+          }
         } else {
           context.go('/order-success/${newOrder.orderNumber}');
         }
@@ -153,14 +161,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
         centerTitle: true,
       ),
-      body: cart.items.isEmpty
+      body: (cart.items.isEmpty && !_orderCompleted)
           ? Center(
               child: Text(
                 tr.tr('bag_empty_title'),
                 style: AppTypography.titleMedium(isKhmer: isKhmer),
               ),
             )
-          : Form(
+          : _orderCompleted
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppColors.primaryBlack),
+                      SizedBox(height: 14),
+                      Text('Đang mở thông tin thanh toán QR...'),
+                    ],
+                  ),
+                )
+              : Form(
               key: _formKey,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
@@ -260,11 +279,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     _buildSectionTitle(isKhmer ? '៣. វិធីសាស្ត្រទូទាត់ប្រាក់' : '3. PAYMENT METHOD', isKhmer),
                     const SizedBox(height: 12),
 
-                    // KHQR (Bakong Payment) Option
+                    // KHQR (ABA Bank Transfer QR) Option
                     _buildPaymentOption(
                       id: 'khqr',
-                      title: 'KHQR (Bakong National QR)',
-                      subtitle: isKhmer ? 'ស្កេនទូទាត់ភ្លាមៗជាមួយគ្រប់កម្មវិធីធនាគារក្នុងស្រុក' : 'Scan & pay with any Cambodian mobile banking app (ABA, Wing, ACLEDA, etc.)',
+                      title: 'ABA Bank KHQR (SENGHOUR PRAK)',
+                      subtitle: isKhmer
+                          ? 'បង្ហាញរូបភាព ABA QR ដើម្បីស្កេនផ្ទេរប្រាក់ភ្លាមៗ (USD: 000 817 811 / KHR: 014 042 356)'
+                          : 'Hiện hình ảnh mã ABA QR để quét chuyển khoản (USD: 000 817 811 / KHR: 014 042 356)',
                       icon: Icons.qr_code_scanner,
                       badge: 'RECOMMENDED',
                     ),
@@ -383,8 +404,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               ),
                             )
                           : Text(
-                              isKhmer ? 'បញ្ជាក់ការកុម្ម៉ង់ទំនិញ' : 'CONFIRM & PLACE ORDER',
-                              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                              _selectedPaymentMethod == 'khqr'
+                                  ? (isKhmer ? 'បញ្ជាទិញ & បង្ហាញ ABA QR' : 'MUA NGAY & HIỆN MÃ QR CHUYỂN KHOẢN')
+                                  : (isKhmer ? 'បញ្ជាក់ការកុម្ម៉ង់ទំនិញ' : 'CONFIRM & PLACE ORDER'),
+                              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
                             ),
                     ),
                     const SizedBox(height: 24),

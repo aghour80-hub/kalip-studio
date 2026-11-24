@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:style_house/core/constants/app_constants.dart';
+import 'package:style_house/core/payment/khqr_service.dart';
 import 'package:style_house/data/models/cart_item_model.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/data/models/product_model.dart';
@@ -12,6 +13,7 @@ import 'package:style_house/presentation/providers/orders_provider.dart';
 import 'package:style_house/presentation/providers/products_provider.dart';
 import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/admin_gate_wrapper.dart';
+import 'package:style_house/presentation/widgets/khqr_payment_sheet.dart';
 
 void main() {
   setUp(() {
@@ -291,6 +293,45 @@ void main() {
 
       // Now secret owner content must be visible
       expect(find.text('SECRET_OWNER_CONTENT'), findsOneWidget);
+    });
+  });
+
+  group('ABA Bank KHQR Payment Sheet', () {
+    testWidgets('Displays authentic owner ABA QR asset and account numbers on checkout', (
+      WidgetTester tester,
+    ) async {
+      final order = OrderModel(
+        id: 'ord-qr',
+        orderNumber: 'SH-2026-7777',
+        createdAt: DateTime(2026, 11, 25),
+        status: OrderStatus.pending,
+        items: const [],
+        subtotalUsd: 100.0,
+        deliveryFeeUsd: 0.0,
+        discountUsd: 0.0,
+        totalUsd: 100.0,
+        deliveryAddress: 'Phnom Penh',
+        paymentMethod: 'ABA Bank KHQR',
+        trackingCode: 'VET-7777',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: KhqrPaymentSheet(
+              order: order,
+              onPaymentSuccess: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining(KhqrService.abaAccountName), findsWidgets);
+      expect(find.textContaining(KhqrService.abaAccountUsd), findsWidgets);
+      expect(find.textContaining(KhqrService.abaAccountKhr), findsWidgets);
+      expect(find.textContaining('\$100.00'), findsWidgets);
+      expect(find.byType(Image), findsOneWidget);
     });
   });
 }

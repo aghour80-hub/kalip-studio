@@ -217,19 +217,24 @@ class OrderDetailsScreen extends ConsumerWidget {
                           ],
                         ),
                         if (order.paymentMethod.contains('KHQR') && order.status == OrderStatus.pending)
-                          OutlinedButton(
+                          OutlinedButton.icon(
                             onPressed: () {
                               KhqrPaymentSheet.show(
                                 context,
                                 order: order,
                                 onPaymentSuccess: () {
+                                  ref.read(ordersProvider.notifier).updateOrderStatus(
+                                        order.orderNumber,
+                                        OrderStatus.confirmed,
+                                      );
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('KHQR Payment Verified!'), backgroundColor: AppColors.success),
+                                    const SnackBar(content: Text('ABA KHQR Payment Verified!'), backgroundColor: AppColors.success),
                                   );
                                 },
                               );
                             },
-                            child: const Text('PAY KHQR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                            icon: const Icon(Icons.qr_code_scanner, size: 15),
+                            label: const Text('MỞ MÃ ABA QR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                           ),
                       ],
                     ),
