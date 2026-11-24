@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/core/theme/app_colors.dart';
@@ -852,11 +853,33 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          tooltip: 'Quay lại cửa hàng / Return to Store',
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
         title: const Text(
           'CATALOG & PRICING',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1.5),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront_outlined, size: 21),
+            tooltip: 'Trang chủ Boutique',
+            onPressed: () => context.go('/'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.dashboard_outlined, size: 21),
+            tooltip: 'Admin Dashboard',
+            onPressed: () => context.push('/admin'),
+          ),
+          const SizedBox(width: 4),
           TextButton.icon(
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primaryBlack,

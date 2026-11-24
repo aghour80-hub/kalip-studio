@@ -264,6 +264,53 @@ class ProfileScreen extends ConsumerWidget {
                   if (!user.isAdmin) {
                     ref.read(authProvider.notifier).toggleAdminRole();
                   }
+                  context.push('/admin/products');
+                },
+                borderRadius: BorderRadius.circular(2),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.canvasLinen,
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: AppColors.borderMedium),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.inventory_2_outlined, color: AppColors.primaryBlack, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'QUẢN LÝ HÀNG & GIÁ CẢ (PRODUCTS & PRICING)',
+                              style: TextStyle(
+                                color: AppColors.primaryBlack,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            Text(
+                              isKhmer
+                                  ? 'គ្រប់គ្រងតម្លៃ បញ្ចុះតម្លៃ បន្ថែម/កែប្រែទំនិញ'
+                                  : 'Sửa giá USD/KHR, giảm giá, thêm mới, sửa, xóa sản phẩm',
+                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.primaryBlack),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () {
+                  if (!user.isAdmin) {
+                    ref.read(authProvider.notifier).toggleAdminRole();
+                  }
                   context.push('/admin');
                 },
                 borderRadius: BorderRadius.circular(2),

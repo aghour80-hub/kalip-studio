@@ -121,6 +121,82 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
 
+          // 2. Admin Quick Access Banner (Quản lý hàng & giá cả)
+          SliverToBoxAdapter(
+            child: InkWell(
+              onTap: () => context.push('/admin/products'),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.canvasLinen,
+                  border: Border(
+                    bottom: BorderSide(color: AppColors.borderLight, width: 0.8),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlack,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text(
+                        'ADMIN',
+                        style: TextStyle(
+                          color: AppColors.luxuryBeige,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isKhmer
+                            ? 'គ្រប់គ្រងទំនិញ & តម្លៃ (Admin Products & Stock)'
+                            : 'Quản lý kho hàng & Giá cả (Admin Products & Stock)',
+                        style: TextStyle(
+                          fontSize: isKhmer ? 11 : 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryBlack,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlack,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.inventory_2_outlined, color: AppColors.luxuryBeige, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            isKhmer ? 'បើកទំព័រ' : 'Mở quản lý',
+                            style: const TextStyle(
+                              color: AppColors.pureWhite,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.arrow_forward_ios, color: AppColors.luxuryBeige, size: 9),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // 2. Hero Editorial Banner Carousel
           SliverToBoxAdapter(
             child: SizedBox(

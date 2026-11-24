@@ -132,7 +132,11 @@ class AppBarHeader extends ConsumerWidget implements PreferredSizeWidget {
             ),
           ),
         ),
-        const SizedBox(width: 4),
+        IconButton(
+          icon: const Icon(Icons.inventory_2_outlined, size: 21, color: AppColors.primaryBlack),
+          tooltip: 'Quản lý hàng & giá cả / Admin Catalog',
+          onPressed: () => context.push('/admin/products'),
+        ),
         Stack(
           alignment: Alignment.center,
           children: [

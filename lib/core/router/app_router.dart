@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:style_house/presentation/providers/auth_provider.dart';
 import 'package:style_house/presentation/screens/admin/admin_dashboard_screen.dart';
 import 'package:style_house/presentation/screens/admin/admin_orders_screen.dart';
 import 'package:style_house/presentation/screens/admin/admin_payments_screen.dart';
@@ -30,13 +29,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) {
-      final isAdminRoute = state.matchedLocation.startsWith('/admin');
-      if (isAdminRoute) {
-        final user = ref.read(authProvider).user;
-        if (user == null || !user.isAdmin) {
-          return '/profile';
-        }
-      }
+      // Allow seamless atelier admin portal access for catalog, inventory, and pricing management
       return null;
     },
     routes: [

@@ -21,11 +21,27 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          tooltip: 'Quay lại cửa hàng / Return to Store',
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
         title: const Text(
           'ATELIER ADMIN',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 2.0),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined),
+            tooltip: 'Catalog & Stock',
+            onPressed: () => context.push('/admin/products'),
+          ),
           IconButton(
             icon: const Icon(Icons.home_outlined),
             tooltip: 'Return to Boutique',
