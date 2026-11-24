@@ -13,17 +13,15 @@ class ProductCard extends ConsumerWidget {
   final ProductModel product;
   final VoidCallback onTap;
 
-  const ProductCard({
-    super.key,
-    required this.product,
-    required this.onTap,
-  });
+  const ProductCard({super.key, required this.product, required this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isKhmer = ref.watch(localizationProvider).isKhmer;
     final currency = ref.watch(currencyProvider);
-    final isWishlisted = ref.watch(wishlistProvider.notifier).isInWishlist(product.id);
+    final isWishlisted = ref
+        .watch(wishlistProvider.notifier)
+        .isInWishlist(product.id);
 
     return InkWell(
       onTap: onTap,
@@ -50,7 +48,10 @@ class ProductCard extends ConsumerWidget {
                     children: [
                       if (product.hasDiscount)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
                           margin: const EdgeInsets.only(bottom: 4),
                           color: AppColors.primaryBlack,
                           child: Text(
@@ -65,7 +66,10 @@ class ProductCard extends ConsumerWidget {
                         ),
                       if (product.isNewArrival && !product.hasDiscount)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
                           color: AppColors.luxuryBeige,
                           child: Text(
                             isKhmer ? 'ថ្មី' : 'NEW',
@@ -88,18 +92,24 @@ class ProductCard extends ConsumerWidget {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: () {
-                        ref.read(wishlistProvider.notifier).toggleWishlist(product);
+                        ref
+                            .read(wishlistProvider.notifier)
+                            .toggleWishlist(product);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppColors.pureWhite.withAlpha((0.85 * 255).round()),
+                          color: AppColors.pureWhite.withAlpha(
+                            (0.85 * 255).round(),
+                          ),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           isWishlisted ? Icons.favorite : Icons.favorite_border,
                           size: 16,
-                          color: isWishlisted ? AppColors.error : AppColors.primaryBlack,
+                          color: isWishlisted
+                              ? AppColors.error
+                              : AppColors.primaryBlack,
                         ),
                       ),
                     ),
@@ -111,30 +121,37 @@ class ProductCard extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             'KALIP studio',
-            style: AppTypography.bodySmall(isKhmer: isKhmer, color: AppColors.luxuryBeigeDark).copyWith(
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w600,
-              fontSize: 10,
-            ),
+            style:
+                AppTypography.bodySmall(
+                  isKhmer: isKhmer,
+                  color: AppColors.luxuryBeigeDark,
+                ).copyWith(
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
           ),
           const SizedBox(height: 2),
           Text(
             product.localizedName(isKhmer),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.titleSmall(isKhmer: isKhmer, color: AppColors.textPrimary).copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.titleSmall(
+              isKhmer: isKhmer,
+              color: AppColors.textPrimary,
+            ).copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 2,
             children: [
               Text(
                 CurrencyFormatter.format(product.priceUsd, currency),
-                style: AppTypography.priceTag(fontSize: 14),
+                style: AppTypography.priceTag(fontSize: 13),
               ),
-              if (product.hasDiscount) ...[
-                const SizedBox(width: 6),
+              if (product.hasDiscount)
                 Text(
                   CurrencyFormatter.format(product.originalPriceUsd!, currency),
                   style: const TextStyle(
@@ -143,7 +160,6 @@ class ProductCard extends ConsumerWidget {
                     color: AppColors.textMuted,
                   ),
                 ),
-              ],
             ],
           ),
         ],

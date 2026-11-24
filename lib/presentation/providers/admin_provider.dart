@@ -38,14 +38,44 @@ class AdminProductsNotifier extends StateNotifier<AdminProductState> {
   AdminProductsNotifier()
       : super(AdminProductState(products: List.from(SampleData.products)));
 
+  void addProduct(ProductModel product) {
+    state = state.copyWith(
+      products: [product, ...state.products],
+    );
+  }
+
+  void updateProduct(ProductModel updated) {
+    state = state.copyWith(
+      products: state.products.map((p) => p.id == updated.id ? updated : p).toList(),
+    );
+  }
+
+  void updatePrice(String productId, double newPriceUsd, {double? newOriginalPriceUsd}) {
+    state = state.copyWith(
+      products: state.products.map((p) {
+        if (p.id == productId) {
+          return p.copyWith(
+            priceUsd: newPriceUsd,
+            originalPriceUsd: newOriginalPriceUsd,
+          );
+        }
+        return p;
+      }).toList(),
+    );
+  }
+
+  void deleteProduct(String productId) {
+    state = state.copyWith(
+      products: state.products.where((p) => p.id != productId).toList(),
+    );
+  }
+
   void restockProduct(String productId, int quantityToAdd) {
     state = state.copyWith(
       products: state.products.map((p) {
         if (p.id == productId) {
           final newStock = (p.stockQuantity + quantityToAdd).clamp(0, 9999);
-          final updatedJson = p.toJson();
-          updatedJson['stock_quantity'] = newStock;
-          return ProductModel.fromJson(updatedJson);
+          return p.copyWith(stockQuantity: newStock);
         }
         return p;
       }).toList(),

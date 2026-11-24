@@ -168,6 +168,58 @@ class ProductModel {
   bool get isInStock => stockQuantity > 0;
   bool get isLowStock => stockQuantity > 0 && stockQuantity <= 5;
 
+  ProductModel copyWith({
+    String? id,
+    String? nameEn,
+    String? nameKm,
+    String? descriptionEn,
+    String? descriptionKm,
+    double? priceUsd,
+    double? originalPriceUsd,
+    String? categoryId,
+    String? gender,
+    List<ProductColor>? colors,
+    List<String>? sizes,
+    List<String>? images,
+    int? stockQuantity,
+    double? rating,
+    int? reviewCount,
+    bool? isNewArrival,
+    bool? isBestSeller,
+    bool? isFeatured,
+    List<String>? detailsEn,
+    List<String>? detailsKm,
+    String? materialEn,
+    String? materialKm,
+    List<ProductVariant>? variants,
+  }) {
+    return ProductModel(
+      id: id ?? this.id,
+      nameEn: nameEn ?? this.nameEn,
+      nameKm: nameKm ?? this.nameKm,
+      descriptionEn: descriptionEn ?? this.descriptionEn,
+      descriptionKm: descriptionKm ?? this.descriptionKm,
+      priceUsd: priceUsd ?? this.priceUsd,
+      originalPriceUsd: originalPriceUsd ?? this.originalPriceUsd,
+      categoryId: categoryId ?? this.categoryId,
+      gender: gender ?? this.gender,
+      colors: colors ?? this.colors,
+      sizes: sizes ?? this.sizes,
+      images: images ?? this.images,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      isNewArrival: isNewArrival ?? this.isNewArrival,
+      isBestSeller: isBestSeller ?? this.isBestSeller,
+      isFeatured: isFeatured ?? this.isFeatured,
+      detailsEn: detailsEn ?? this.detailsEn,
+      detailsKm: detailsKm ?? this.detailsKm,
+      materialEn: materialEn ?? this.materialEn,
+      materialKm: materialKm ?? this.materialKm,
+      variants: variants ?? this.variants,
+    );
+  }
+
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     final imagesList = (json['images'] as List<dynamic>?)
             ?.map((e) => e is Map ? e['image_url'] as String : e as String)
