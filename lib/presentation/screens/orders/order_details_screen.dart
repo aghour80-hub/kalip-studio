@@ -9,6 +9,7 @@ import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/presentation/providers/orders_provider.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/khqr_payment_sheet.dart';
 import 'package:style_house/presentation/widgets/luxury_image.dart';
 
@@ -219,9 +220,15 @@ class OrderDetailsScreen extends ConsumerWidget {
                         if (order.paymentMethod.contains('KHQR') && order.status == OrderStatus.pending)
                           OutlinedButton.icon(
                             onPressed: () {
+                              final settings = ref.read(storeSettingsProvider);
                               KhqrPaymentSheet.show(
                                 context,
                                 order: order,
+                                qrImageSource: settings.effectiveQrImage,
+                                bankName: settings.bankName,
+                                accountName: settings.bankAccountName,
+                                accountUsd: settings.bankAccountUsd,
+                                accountKhr: settings.bankAccountKhr,
                                 onPaymentSuccess: () {
                                   ref.read(ordersProvider.notifier).updateOrderStatus(
                                         order.orderNumber,

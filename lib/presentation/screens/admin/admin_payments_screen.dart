@@ -9,6 +9,8 @@ import 'package:style_house/data/services/payment_service.dart';
 import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/orders_provider.dart';
 import 'package:style_house/presentation/providers/store_settings_provider.dart';
+import 'package:style_house/presentation/widgets/admin_bottom_nav.dart';
+import 'package:style_house/presentation/widgets/luxury_image.dart';
 
 class AdminPaymentsScreen extends ConsumerStatefulWidget {
   const AdminPaymentsScreen({super.key});
@@ -52,7 +54,8 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen> {
   Widget build(BuildContext context) {
     final currency = ref.watch(currencyProvider);
     final orders = ref.watch(ordersProvider);
-    final rate = ref.watch(storeSettingsProvider).usdToKhrRate;
+    final settings = ref.watch(storeSettingsProvider);
+    final rate = settings.usdToKhrRate;
 
     final filtered = orders.where((o) {
       if (_filter == 'pending') return o.status == OrderStatus.pending;
@@ -68,21 +71,18 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen> {
         .fold<double>(0.0, (sum, o) => sum + o.totalUsd);
 
     return Scaffold(
+      backgroundColor: AppColors.canvasLinen,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/admin'),
+          icon: const Icon(Icons.storefront_outlined, size: 21),
+          tooltip: 'Về Cửa hàng',
+          onPressed: () => context.go('/'),
         ),
         title: const Text(
-          'PAYMENT AUDITS & SLIPS',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+          'FINANCE & QR AUDITS',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.4),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.dashboard_outlined, size: 20),
-            tooltip: 'Admin Dashboard',
-            onPressed: () => context.push('/admin'),
-          ),
           IconButton(
             icon: const Icon(Icons.lock_outline, size: 20, color: AppColors.error),
             tooltip: 'Lock Owner Mode',
@@ -91,13 +91,9 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen> {
               context.go('/');
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.storefront_outlined, size: 20),
-            tooltip: 'Boutique Storefront',
-            onPressed: () => context.go('/'),
-          ),
         ],
       ),
+      bottomNavigationBar: const AdminBottomNav(currentIndex: 3),
       body: Column(
         children: [
           Container(
@@ -108,23 +104,67 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen> {
               children: [
                 Column(
                   children: [
-                    Text('\$${clearedTotal.toStringAsFixed(2)}', style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text('\$${clearedTotal.toStringAsFixed(2)}', style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16)),
                     const Text('CLEARED', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1.0)),
                   ],
                 ),
                 Container(width: 1, height: 24, color: Colors.white24),
                 Column(
                   children: [
-                    Text('\$${pendingTotal.toStringAsFixed(2)}', style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text('\$${pendingTotal.toStringAsFixed(2)}', style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 16)),
                     const Text('PENDING AUDIT', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1.0)),
                   ],
                 ),
               ],
             ),
           ),
+
+          // Active Receiving Bank QR Summary Card
           Container(
-            color: AppColors.canvasLinen,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF005B7F).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 44,
+                  height: 54,
+                  child: LuxuryImage(
+                    imageUrl: settings.effectiveQrImage,
+                    fit: BoxFit.cover,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${settings.bankName} • ${settings.bankAccountName}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'USD: ${settings.bankAccountUsd}  |  KHR: ${settings.bankAccountKhr}',
+                        style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.go('/admin'),
+                  child: const Text('Change QR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             child: Row(
               children: [
                 for (final f in [
@@ -149,11 +189,12 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen> {
               ],
             ),
           ),
+
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
               itemCount: filtered.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final order = filtered[index];
                 final isKhqr = order.paymentMethod.contains('KHQR');
@@ -162,10 +203,10 @@ class _AdminPaymentsScreenState extends ConsumerState<AdminPaymentsScreen> {
                 final khrAmount = (order.totalUsd * rate / 100).round() * 100;
 
                 return Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: AppColors.pureWhite,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppColors.borderLight),
                   ),
                   child: Column(

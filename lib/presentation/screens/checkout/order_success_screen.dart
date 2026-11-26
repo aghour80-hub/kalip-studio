@@ -3,12 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:style_house/core/currency/currency_formatter.dart';
-import 'package:style_house/core/payment/khqr_service.dart';
 import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/presentation/providers/orders_provider.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/khqr_payment_sheet.dart';
+import 'package:style_house/presentation/widgets/luxury_image.dart';
 
 class OrderSuccessScreen extends ConsumerWidget {
   final String orderId;
@@ -21,6 +22,7 @@ class OrderSuccessScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(ordersProvider);
+    final settings = ref.watch(storeSettingsProvider);
     OrderModel? order;
     try {
       order = orders.firstWhere((o) => o.orderNumber == orderId || o.id == orderId);
@@ -121,9 +123,9 @@ class OrderSuccessScreen extends ConsumerWidget {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'ABA BANK • ${KhqrService.abaAccountName} • USD: ${KhqrService.abaAccountUsd} | KHR: ${KhqrService.abaAccountKhr}',
-                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      Text(
+                        '${settings.bankName} • ${settings.bankAccountName} • USD: ${settings.bankAccountUsd} | KHR: ${settings.bankAccountKhr}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                       if (isPendingKhqr) ...[
@@ -132,8 +134,8 @@ class OrderSuccessScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(6),
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxHeight: 280),
-                            child: Image.asset(
-                              KhqrService.abaQrAssetPath,
+                            child: LuxuryImage(
+                              imageUrl: settings.effectiveQrImage,
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -145,6 +147,11 @@ class OrderSuccessScreen extends ConsumerWidget {
                             KhqrPaymentSheet.show(
                               context,
                               order: target,
+                              qrImageSource: settings.effectiveQrImage,
+                              bankName: settings.bankName,
+                              accountName: settings.bankAccountName,
+                              accountUsd: settings.bankAccountUsd,
+                              accountKhr: settings.bankAccountKhr,
                               onPaymentSuccess: () {
                                 ref.read(ordersProvider.notifier).updateOrderStatus(
                                       target.orderNumber,

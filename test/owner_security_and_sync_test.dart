@@ -1,19 +1,25 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/core/payment/khqr_service.dart';
+import 'package:style_house/core/utils/image_upload_service.dart';
 import 'package:style_house/data/models/cart_item_model.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/data/models/product_model.dart';
 import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/admin_provider.dart';
+import 'package:style_house/presentation/providers/cart_provider.dart';
 import 'package:style_house/presentation/providers/orders_provider.dart';
 import 'package:style_house/presentation/providers/products_provider.dart';
 import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/admin_gate_wrapper.dart';
+import 'package:style_house/presentation/widgets/admin_product_editor_sheet.dart';
 import 'package:style_house/presentation/widgets/khqr_payment_sheet.dart';
+import 'package:style_house/presentation/widgets/luxury_image.dart';
 
 void main() {
   setUp(() {
@@ -332,6 +338,91 @@ void main() {
       expect(find.textContaining(KhqrService.abaAccountKhr), findsWidgets);
       expect(find.textContaining('\$100.00'), findsWidgets);
       expect(find.byType(Image), findsOneWidget);
+    });
+  });
+
+  group('Free Product Image Upload, Owner Coupons & Custom Bank QR', () {
+    // 1x1 transparent PNG bytes
+    final samplePngBytes = Uint8List.fromList(base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+    ));
+
+    test('ImageUploadService encodes raw image bytes to portable free Data URI', () async {
+      final result = await ImageUploadService.encodeBytes(samplePngBytes, fileName: 'dress.png');
+      expect(result.dataUri, startsWith('data:image/png;base64,'));
+      expect(result.approxBytes, greaterThan(0));
+      expect(LuxuryImage.isDataUri(result.dataUri), isTrue);
+    });
+
+    testWidgets('LuxuryImage renders uploaded base64 Data URI via Image.memory', (tester) async {
+      final uploaded = await ImageUploadService.encodeBytes(samplePngBytes, fileName: 'bag.png');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LuxuryImage(imageUrl: uploaded.dataUri, width: 100, height: 100),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    test('Owner custom promo coupons sync with CartNotifier and custom Bank QR saves cleanly', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final settingsNotifier = container.read(storeSettingsProvider.notifier);
+      await settingsNotifier.addOrUpdateCoupon(
+        const StoreCoupon(code: 'KALIP25', discountPercent: 25, minSpendUsd: 0),
+      );
+      expect(container.read(storeSettingsProvider).coupons.any((c) => c.code == 'KALIP25'), isTrue);
+
+      final cartNotifier = container.read(cartProvider.notifier);
+      final applied = cartNotifier.applyPromoCode('KALIP25');
+      expect(applied, isTrue);
+      expect(container.read(cartProvider).discountPercentage, 0.25);
+
+      // Update & restore custom QR image
+      final uploadedQr = await ImageUploadService.encodeBytes(samplePngBytes, fileName: 'qr.png');
+      await settingsNotifier.updateBankQr(
+        customQrImageData: uploadedQr.dataUri,
+        bankAccountName: 'KALIP OWNER',
+      );
+      expect(container.read(storeSettingsProvider).effectiveQrImage, uploadedQr.dataUri);
+      expect(container.read(storeSettingsProvider).bankAccountName, 'KALIP OWNER');
+
+      await settingsNotifier.updateBankQr(clearCustomQr: true);
+      expect(container.read(storeSettingsProvider).effectiveQrImage, KhqrService.abaQrAssetPath);
+    });
+
+    test('duplicateProduct clones item into catalog', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final before = container.read(adminProductsProvider).products;
+      container.read(adminProductsProvider.notifier).duplicateProduct(before.first);
+      final after = container.read(adminProductsProvider).products;
+      expect(after.length, before.length + 1);
+      expect(after.first.nameEn, contains('(Copy)'));
+    });
+
+    testWidgets('AdminProductEditorSheet displays free upload UI and publishes new product', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: AdminProductEditorSheet(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('100% FREE'), findsOneWidget);
+      expect(find.textContaining('Tải ảnh từ Máy'), findsOneWidget);
+      expect(find.text('PUBLISH PRODUCT LIVE'), findsOneWidget);
     });
   });
 }

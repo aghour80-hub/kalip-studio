@@ -7,6 +7,7 @@ import 'package:style_house/core/localization/language_provider.dart';
 import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/core/theme/app_typography.dart';
 import 'package:style_house/presentation/providers/cart_provider.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/app_bar_header.dart';
 import 'package:style_house/presentation/widgets/luxury_image.dart';
 
@@ -253,10 +254,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final code in ['STYLE10 (-10%)', 'VIP10 (-10%)', 'LUXURY20 (-20%)'])
+                      for (final coupon in ref.watch(storeSettingsProvider).coupons.where((c) => c.isActive))
                         InkWell(
                           onTap: () {
-                            _promoController.text = code.split(' ').first;
+                            _promoController.text = coupon.code;
                             _applyPromo(isKhmer);
                           },
                           child: Container(
@@ -267,7 +268,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              code,
+                              '${coupon.code} (-${coupon.discountPercent.toInt()}%)',
                               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primaryBlack),
                             ),
                           ),

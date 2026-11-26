@@ -12,6 +12,7 @@ import 'package:style_house/presentation/providers/ai_chat_provider.dart';
 import 'package:style_house/presentation/providers/auth_provider.dart';
 import 'package:style_house/presentation/providers/cart_provider.dart';
 import 'package:style_house/presentation/providers/orders_provider.dart';
+import 'package:style_house/presentation/providers/store_settings_provider.dart';
 import 'package:style_house/presentation/widgets/khqr_payment_sheet.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -105,10 +106,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
       if (mounted) {
         if (_selectedPaymentMethod == 'khqr') {
+          final settings = ref.read(storeSettingsProvider);
           var paymentConfirmed = false;
           await KhqrPaymentSheet.show(
             context,
             order: newOrder,
+            qrImageSource: settings.effectiveQrImage,
+            bankName: settings.bankName,
+            accountName: settings.bankAccountName,
+            accountUsd: settings.bankAccountUsd,
+            accountKhr: settings.bankAccountKhr,
             onPaymentSuccess: () {
               paymentConfirmed = true;
               ref.read(ordersProvider.notifier).updateOrderStatus(

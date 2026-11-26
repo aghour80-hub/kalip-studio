@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:style_house/core/currency/currency_formatter.dart';
 import 'package:style_house/core/payment/cod_service.dart';
 import 'package:style_house/core/payment/khqr_service.dart';
@@ -10,21 +9,37 @@ import 'package:style_house/core/theme/app_typography.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/data/services/n8n_webhook_service.dart';
 import 'package:style_house/data/services/payment_service.dart';
+import 'package:style_house/presentation/widgets/luxury_image.dart';
 
 class KhqrPaymentSheet extends StatefulWidget {
   final OrderModel order;
   final VoidCallback onPaymentSuccess;
+  final String qrImageSource;
+  final String bankName;
+  final String accountName;
+  final String accountUsd;
+  final String accountKhr;
 
   const KhqrPaymentSheet({
     super.key,
     required this.order,
     required this.onPaymentSuccess,
+    this.qrImageSource = KhqrService.abaQrAssetPath,
+    this.bankName = KhqrService.abaBankName,
+    this.accountName = KhqrService.abaAccountName,
+    this.accountUsd = KhqrService.abaAccountUsd,
+    this.accountKhr = KhqrService.abaAccountKhr,
   });
 
   static Future<void> show(
     BuildContext context, {
     required OrderModel order,
     required VoidCallback onPaymentSuccess,
+    String qrImageSource = KhqrService.abaQrAssetPath,
+    String bankName = KhqrService.abaBankName,
+    String accountName = KhqrService.abaAccountName,
+    String accountUsd = KhqrService.abaAccountUsd,
+    String accountKhr = KhqrService.abaAccountKhr,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -33,6 +48,11 @@ class KhqrPaymentSheet extends StatefulWidget {
       builder: (ctx) => KhqrPaymentSheet(
         order: order,
         onPaymentSuccess: onPaymentSuccess,
+        qrImageSource: qrImageSource,
+        bankName: bankName,
+        accountName: accountName,
+        accountUsd: accountUsd,
+        accountKhr: accountKhr,
       ),
     );
   }
@@ -43,7 +63,6 @@ class KhqrPaymentSheet extends StatefulWidget {
 
 class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
   final PaymentService _paymentService = PaymentService();
-  late String _khqrPayload;
   late int _remainingSeconds;
   Timer? _countdownTimer;
   bool _isVerifying = false;
@@ -53,11 +72,6 @@ class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
   void initState() {
     super.initState();
     _remainingSeconds = 600; // 10 minutes validity window
-    _khqrPayload = KhqrService.generateKhqrPayload(
-      orderNumber: widget.order.orderNumber,
-      amountUsd: widget.order.totalUsd,
-      exchangeRate: CurrencyFormatter.liveExchangeRate,
-    );
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
@@ -104,17 +118,9 @@ class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
               maxScale: 4.0,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Image.asset(
-                  KhqrService.abaQrAssetPath,
+                child: LuxuryImage(
+                  imageUrl: widget.qrImageSource,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => Container(
-                    color: AppColors.pureWhite,
-                    padding: const EdgeInsets.all(24),
-                    child: QrImageView(
-                      data: _khqrPayload,
-                      size: 260,
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -201,9 +207,9 @@ class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
                       color: const Color(0xFF005B7F), // ABA Deep Blue
                       borderRadius: BorderRadius.circular(3),
                     ),
-                    child: const Text(
-                      "ABA' KHQR",
-                      style: TextStyle(
+                    child: Text(
+                      "${widget.bankName} KHQR",
+                      style: const TextStyle(
                         color: AppColors.pureWhite,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.2,
@@ -212,12 +218,15 @@ class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    KhqrService.abaAccountName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                  Flexible(
+                    child: Text(
+                      widget.accountName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ],
@@ -315,17 +324,9 @@ class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Flexible(
-                            child: Image.asset(
-                              KhqrService.abaQrAssetPath,
+                            child: LuxuryImage(
+                              imageUrl: widget.qrImageSource,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: QrImageView(
-                                  data: _khqrPayload,
-                                  version: QrVersions.auto,
-                                  size: 200,
-                                ),
-                              ),
                             ),
                           ),
                           Container(
@@ -399,21 +400,21 @@ class _KhqrPaymentSheetState extends State<KhqrPaymentSheet> {
                 children: [
                   ActionChip(
                     avatar: const Icon(Icons.copy, size: 14, color: Color(0xFF005B7F)),
-                    label: const Text(
-                      'Copy USD: ${KhqrService.abaAccountUsd}',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    label: Text(
+                      'Copy USD: ${widget.accountUsd}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     backgroundColor: AppColors.canvasLinen,
-                    onPressed: () => _copyValue('ABA USD Account', KhqrService.abaAccountUsdRaw),
+                    onPressed: () => _copyValue('USD Account', widget.accountUsd.replaceAll(' ', '')),
                   ),
                   ActionChip(
                     avatar: const Icon(Icons.copy, size: 14, color: Color(0xFF005B7F)),
-                    label: const Text(
-                      'Copy KHR: ${KhqrService.abaAccountKhr}',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    label: Text(
+                      'Copy KHR: ${widget.accountKhr}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     backgroundColor: AppColors.canvasLinen,
-                    onPressed: () => _copyValue('ABA KHR Account', KhqrService.abaAccountKhrRaw),
+                    onPressed: () => _copyValue('KHR Account', widget.accountKhr.replaceAll(' ', '')),
                   ),
                 ],
               ),

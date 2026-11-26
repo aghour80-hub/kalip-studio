@@ -91,6 +91,7 @@ class OrderRepository {
     List<ProductModel>? catalogProducts,
     double? freeShippingThresholdUsd,
     double? standardShippingFeeUsd,
+    List<CouponModel>? customCoupons,
   }) async {
     if (items.isEmpty) {
       throw Exception('Cannot create order with an empty shopping cart');
@@ -140,7 +141,17 @@ class OrderRepository {
     // 2. Validate and apply coupon discount
     double discountUsd = 0.0;
     if (couponCode != null && couponCode.isNotEmpty) {
-      final coupon = await validateCoupon(couponCode, calculatedSubtotal);
+      final cleanCode = couponCode.trim().toUpperCase();
+      CouponModel? matchedCustom;
+      if (customCoupons != null) {
+        for (final c in customCoupons) {
+          if (c.code.toUpperCase() == cleanCode && c.isValidFor(calculatedSubtotal)) {
+            matchedCustom = c;
+            break;
+          }
+        }
+      }
+      final coupon = matchedCustom ?? await validateCoupon(couponCode, calculatedSubtotal);
       if (coupon != null) {
         discountUsd = coupon.calculateDiscount(calculatedSubtotal);
       }

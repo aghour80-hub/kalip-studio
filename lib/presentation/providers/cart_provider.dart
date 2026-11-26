@@ -73,12 +73,15 @@ class CartState {
 
 class CartNotifier extends StateNotifier<CartState> {
   final CartRepository _cartRepository;
+  List<StoreCoupon> _activeCoupons;
 
   CartNotifier({
     CartRepository? cartRepository,
     double freeShippingThresholdUsd = AppConstants.freeShippingThresholdUsd,
     double standardShippingFeeUsd = AppConstants.standardShippingFeeUsd,
+    List<StoreCoupon> coupons = StoreSettingsState.defaultCoupons,
   })  : _cartRepository = cartRepository ?? CartRepository(),
+        _activeCoupons = coupons,
         super(CartState(
           items: List.from(SampleData.initialCart),
           freeShippingThresholdUsd: freeShippingThresholdUsd,
@@ -125,7 +128,8 @@ class CartNotifier extends StateNotifier<CartState> {
     } catch (_) {}
   }
 
-  void updateShippingConfig(double threshold, double fee) {
+  void updateStoreConfig(double threshold, double fee, List<StoreCoupon> coupons) {
+    _activeCoupons = coupons;
     state = state.copyWith(
       freeShippingThresholdUsd: threshold,
       standardShippingFeeUsd: fee,
@@ -232,19 +236,30 @@ class CartNotifier extends StateNotifier<CartState> {
 
   bool applyPromoCode(String code) {
     final clean = code.trim().toUpperCase();
-    if (clean == 'STYLE10' || clean == 'VIP10' || clean == 'CAMBODIA') {
-      state = state.copyWith(promoCode: clean, discountPercentage: 0.10, clearWarning: true);
-      _persistCart();
-      return true;
-    } else if (clean == 'LUXURY20') {
-      if (state.subtotalUsd < 100) {
-        state = state.copyWith(warningMessage: 'LUXURY20 requires minimum order of \$100.00');
+    StoreCoupon? matched;
+    for (final c in _activeCoupons) {
+      if (c.isActive && c.code.toUpperCase() == clean) {
+        matched = c;
+        break;
+      }
+    }
+
+    if (matched != null) {
+      if (state.subtotalUsd < matched.minSpendUsd) {
+        state = state.copyWith(
+          warningMessage: '${matched.code} requires minimum order of \$${matched.minSpendUsd.toStringAsFixed(2)}',
+        );
         return false;
       }
-      state = state.copyWith(promoCode: clean, discountPercentage: 0.20, clearWarning: true);
+      state = state.copyWith(
+        promoCode: matched.code,
+        discountPercentage: matched.discountFraction,
+        clearWarning: true,
+      );
       _persistCart();
       return true;
     }
+
     state = state.copyWith(warningMessage: 'Invalid or expired promotional code.');
     return false;
   }
@@ -261,11 +276,18 @@ final cartRepositoryProvider = Provider<CartRepository>((ref) {
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   final repository = ref.watch(cartRepositoryProvider);
-  final notifier = CartNotifier(cartRepository: repository);
+  final initialSettings = ref.read(storeSettingsProvider);
+  final notifier = CartNotifier(
+    cartRepository: repository,
+    freeShippingThresholdUsd: initialSettings.freeShippingThresholdUsd,
+    standardShippingFeeUsd: initialSettings.standardShippingFeeUsd,
+    coupons: initialSettings.coupons,
+  );
   ref.listen<StoreSettingsState>(storeSettingsProvider, (_, next) {
-    notifier.updateShippingConfig(
+    notifier.updateStoreConfig(
       next.freeShippingThresholdUsd,
       next.standardShippingFeeUsd,
+      next.coupons,
     );
   });
   return notifier;

@@ -131,6 +131,16 @@ class AdminProductsNotifier extends StateNotifier<AdminProductState> {
     _persistCatalog();
   }
 
+  void duplicateProduct(ProductModel original) {
+    final copy = original.copyWith(
+      id: 'prod-${DateTime.now().millisecondsSinceEpoch}',
+      nameEn: '${original.nameEn} (Copy)',
+      nameKm: '${original.nameKm} (Copy)',
+      isNewArrival: true,
+    );
+    addProduct(copy);
+  }
+
   void toggleProductStatus(String productId) {
     state = state.copyWith(
       products: state.products.map((p) {

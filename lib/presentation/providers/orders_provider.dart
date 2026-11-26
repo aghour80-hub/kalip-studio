@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:style_house/core/constants/app_constants.dart';
 import 'package:style_house/data/mock/sample_data.dart';
 import 'package:style_house/data/models/cart_item_model.dart';
+import 'package:style_house/data/models/coupon_model.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/data/repositories/order_repository.dart';
 import 'package:style_house/presentation/providers/admin_provider.dart';
@@ -77,6 +78,17 @@ class OrdersNotifier extends StateNotifier<List<OrderModel>> {
       catalogProducts: catalog,
       freeShippingThresholdUsd: settings?.freeShippingThresholdUsd,
       standardShippingFeeUsd: settings?.standardShippingFeeUsd,
+      customCoupons: settings?.coupons
+          .where((c) => c.isActive)
+          .map(
+            (c) => CouponModel(
+              id: 'owner-${c.code}',
+              code: c.code,
+              discountPercentage: c.discountPercent,
+              minSpendUsd: c.minSpendUsd,
+            ),
+          )
+          .toList(),
     );
 
     // Deduct stock from Atelier Inventory

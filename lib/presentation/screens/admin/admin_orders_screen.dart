@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -7,6 +8,8 @@ import 'package:style_house/core/theme/app_colors.dart';
 import 'package:style_house/data/models/order_model.dart';
 import 'package:style_house/presentation/providers/admin_auth_provider.dart';
 import 'package:style_house/presentation/providers/orders_provider.dart';
+import 'package:style_house/presentation/widgets/admin_bottom_nav.dart';
+import 'package:style_house/presentation/widgets/luxury_image.dart';
 
 class AdminOrdersScreen extends ConsumerStatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -18,6 +21,22 @@ class AdminOrdersScreen extends ConsumerStatefulWidget {
 class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
   String _selectedStatusFilter = 'all';
   String _searchQuery = '';
+
+  Color _statusColor(OrderStatus s) {
+    switch (s) {
+      case OrderStatus.pending:
+        return AppColors.warning;
+      case OrderStatus.confirmed:
+      case OrderStatus.processing:
+        return AppColors.luxuryBeigeDark;
+      case OrderStatus.delivering:
+        return AppColors.info;
+      case OrderStatus.delivered:
+        return AppColors.success;
+      case OrderStatus.cancelled:
+        return AppColors.error;
+    }
+  }
 
   void _transitionOrder(OrderModel order) {
     OrderStatus nextStatus;
@@ -93,22 +112,23 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
       return true;
     }).toList();
 
+    final pendingCount = orders.where((o) => o.status == OrderStatus.pending).length;
+    final deliveringCount = orders.where((o) => o.status == OrderStatus.delivering).length;
+    final deliveredCount = orders.where((o) => o.status == OrderStatus.delivered).length;
+
     return Scaffold(
+      backgroundColor: AppColors.canvasLinen,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/admin'),
+          icon: const Icon(Icons.storefront_outlined, size: 21),
+          tooltip: 'Về Cửa hàng',
+          onPressed: () => context.go('/'),
         ),
         title: const Text(
           'ORDER FULFILLMENT',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.4),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.dashboard_outlined, size: 20),
-            tooltip: 'Admin Dashboard',
-            onPressed: () => context.push('/admin'),
-          ),
           IconButton(
             icon: const Icon(Icons.lock_outline, size: 20, color: AppColors.error),
             tooltip: 'Lock Owner Mode',
@@ -117,30 +137,42 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
               context.go('/');
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.storefront_outlined, size: 20),
-            tooltip: 'Boutique Storefront',
-            onPressed: () => context.go('/'),
-          ),
         ],
       ),
+      bottomNavigationBar: const AdminBottomNav(currentIndex: 2),
       body: Column(
         children: [
+          // Top Order Metrics Strip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            color: AppColors.primaryBlack,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _stat('PENDING', '$pendingCount', AppColors.warning),
+                Container(width: 1, height: 22, color: Colors.white24),
+                _stat('DELIVERING', '$deliveringCount', AppColors.luxuryBeige),
+                Container(width: 1, height: 22, color: Colors.white24),
+                _stat('DELIVERED', '$deliveredCount', AppColors.success),
+              ],
+            ),
+          ),
+
           // Search Bar & Filter Tabs
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            color: AppColors.canvasLinen,
+            color: AppColors.pureWhite,
             child: Column(
               children: [
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Search by Order #, customer name, or phone...',
+                    hintText: 'Tìm theo mã đơn, tên khách hoặc SĐT...',
                     prefixIcon: const Icon(Icons.search, size: 18),
                     filled: true,
-                    fillColor: AppColors.pureWhite,
+                    fillColor: AppColors.canvasLinen,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(4),
                       borderSide: const BorderSide(color: AppColors.borderLight),
                     ),
                   ),
@@ -177,24 +209,22 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
           Expanded(
             child: filtered.isEmpty
                 ? const Center(
-                    child: Text('No orders matching filter.', style: TextStyle(color: AppColors.textSecondary)),
+                    child: Text('Không có đơn hàng nào khớp bộ lọc.', style: TextStyle(color: AppColors.textSecondary)),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     itemCount: filtered.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final order = filtered[index];
-                      final isCancelled = order.status == OrderStatus.cancelled;
+                      final color = _statusColor(order.status);
 
                       return Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: AppColors.pureWhite,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: isCancelled ? AppColors.error.withValues(alpha: 0.4) : AppColors.borderLight,
-                          ),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: color.withValues(alpha: 0.35)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,22 +235,46 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                                 Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  color: isCancelled ? AppColors.error.withValues(alpha: 0.15) : AppColors.luxuryBeigeLight,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
                                   child: Text(
                                     order.status.code.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: isCancelled ? AppColors.error : AppColors.primaryBlack,
-                                    ),
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text(
-                              'Recipient: ${order.customerName ?? "Customer"} (${order.phoneNumber ?? "No phone"})',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${order.customerName ?? "Customer"} • ${order.phoneNumber ?? "No phone"}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                                if (order.phoneNumber != null && order.phoneNumber!.isNotEmpty)
+                                  InkWell(
+                                    onTap: () {
+                                      Clipboard.setData(ClipboardData(text: order.phoneNumber!));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Copied phone: ${order.phoneNumber}')),
+                                      );
+                                    },
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.copy, size: 13, color: AppColors.luxuryBeigeDark),
+                                          SizedBox(width: 3),
+                                          Text('Copy SĐT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.luxuryBeigeDark)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             Text(
                               'Address: ${order.deliveryAddress}',
@@ -231,20 +285,53 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                               style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                             ),
                             if (order.items.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: order.items.map((item) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    color: AppColors.canvasLinen,
-                                    child: Text(
-                                      '${item.quantity}x ${item.product.nameEn} (${item.selectedSize})',
-                                      style: const TextStyle(fontSize: 10, color: AppColors.textPrimary),
-                                    ),
-                                  );
-                                }).toList(),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                height: 50,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: order.items.length,
+                                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                                  itemBuilder: (_, i) {
+                                    final item = order.items[i];
+                                    return Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.canvasLinen,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 34,
+                                            height: 42,
+                                            child: LuxuryImage(
+                                              imageUrl: item.product.images.first,
+                                              borderRadius: BorderRadius.circular(2),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                item.product.nameEn,
+                                                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                                              ),
+                                              Text(
+                                                'x${item.quantity} • Size ${item.selectedSize}',
+                                                style: const TextStyle(fontSize: 9.5, color: AppColors.textSecondary),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(width: 4),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ],
                             const SizedBox(height: 10),
@@ -282,7 +369,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                         decoration: BoxDecoration(
                                           border: Border.all(color: AppColors.borderMedium),
-                                          borderRadius: BorderRadius.circular(2),
+                                          borderRadius: BorderRadius.circular(3),
                                         ),
                                         child: const Row(
                                           children: [
@@ -315,6 +402,15 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _stat(String label, String val, Color color) {
+    return Column(
+      children: [
+        Text(val, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 0.8)),
+      ],
     );
   }
 }
